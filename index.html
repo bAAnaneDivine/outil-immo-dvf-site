@@ -1206,7 +1206,10 @@ function lireAnnonce() {
 
 function lireSeuils() {
   const v = id => { const x = document.getElementById(id).value; return x === "" ? null : +x; };
-  return { seuilBas: v("va-seuil-bas") ?? -10, seuilHaut: v("va-seuil-haut") ?? 10 };
+  // « sous le marché » toujours à 0 % ou en dessous, « au-dessus » à 0 % ou au-delà :
+  // les deux seuils ne peuvent donc jamais se croiser
+  const bas = v("va-seuil-bas"), haut = v("va-seuil-haut");
+  return { seuilBas: Number.isFinite(bas) ? Math.min(bas, 0) : -10, seuilHaut: Number.isFinite(haut) ? Math.max(haut, 0) : 10 };
 }
 
 function classerVerdict(ecart, { seuilBas, seuilHaut }) {
@@ -1220,7 +1223,9 @@ function analyserAnnonce(a) {
   const modeRayon = a.mode === "rayon";
   if (!modeRayon && !c) return { erreur: "Commune non trouvée : choisissez-la dans la liste proposée." };
   if (modeRayon && !a.point) return { erreur: "Placez d'abord le bien sur la carte (clic ou adresse)." };
-  if (!a.prix || !a.surface || a.surface < surfaceMin || a.prix - a.agence <= 0)
+  if (a.agence < 0) return { erreur: "Les frais d'agence ne peuvent pas être négatifs (laissez le champ vide s'il n'y en a pas)." };
+  if (a.prix && a.agence >= a.prix) return { erreur: "Les frais d'agence ne peuvent pas atteindre le prix affiché." };
+  if (!a.prix || !a.surface || a.surface < surfaceMin)
     return { erreur: `Indiquez au moins un prix et une surface habitable (${surfaceMin} m² minimum).` };
   // Filtre facultatif : comparer seulement aux maisons dont le terrain est proche de celui de l'annonce
   if (a.terrainTol && !a.terrain) return { erreur: "Indiquez le terrain de l'annonce pour comparer aux maisons au terrain proche." };
@@ -1434,7 +1439,8 @@ async function copierComparables() {
     zone.remove();
     if (!ok) { messageExport("Copie impossible ici : utilisez « Télécharger (CSV) »."); return; }
   }
-  messageExport(`${pluriel(t.lignes.length, "vente")} copiées : collez-les dans un tableur.`);
+  const n = t.lignes.length;
+  messageExport(`${pluriel(n, "vente")} ${n > 1 ? "copiées : collez-les" : "copiée : collez-la"} dans un tableur.`);
 }
 
 // Fait télécharger un fichier créé dans la page (rien n'est envoyé : le fichier est fabriqué sur place)
@@ -1529,16 +1535,27 @@ function resumeVerdict(res) {
     : { n: res.comp.length, med: Math.round(res.med), ecart: Math.round(res.ecart * 10) / 10, donnees: FIN_DONNEES };
 }
 
+// Même annonce (mêmes critères, après nettoyage) : sert à éviter les doublons (double-clic…)
+const cleAnnonce = a => JSON.stringify((nettoyerSuivie({ annonce: a }) || {}).annonce ?? null);
+
 function suivreAnnonce() {
   if (!dernierResultat) return;
   const msg = document.getElementById("va-suivre-msg");
+  const bouton = document.getElementById("va-suivre");
   const nom = document.getElementById("va-suivre-nom").value.trim().slice(0, 80);
   const liste = lireSuivies();
+  const cle = cleAnnonce(dernierResultat.a);
+  if (liste.some(s => cleAnnonce(s.annonce) === cle)) {
+    msg.textContent = "Cette annonce est déjà suivie : voir « Annonces suivies » plus bas.";
+    if (bouton) bouton.disabled = true;
+    return;
+  }
   liste.push({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, nom, annonce: dernierResultat.a,
                enregistreLe: new Date().toISOString().slice(0, 10), verdict: resumeVerdict(dernierResultat) });
   if (ecrireSuivies(liste)) {
     msg.textContent = "Annonce enregistrée dans ce navigateur : voir « Annonces suivies » plus bas.";
     document.getElementById("va-suivre-nom").value = "";
+    if (bouton) bouton.disabled = true;   // un second clic n'enregistre pas l'annonce une seconde fois
   } else {
     msg.textContent = "Enregistrement impossible : ce navigateur bloque le stockage local (navigation privée ?).";
   }
@@ -1913,7 +1930,9 @@ function calculerBudget(e) {
       <p class="aide">Classement : communes où la plus grande part des ventes de ${LIBELLE_TYPE[type].des} ${B_FENETRE.texte}
         est entrée dans ce prix${crit ? ` en ayant ${crit}` : ""}. Surface atteignable = prix d'achat ÷ prix médian au m²
         (année ${DERNIERE}, ou ${B_ANNEES[0]}-${B_ANNEES[1]} cumulées s'il y a moins de ${SEUIL} ventes en ${DERNIERE}).
-        ${masquees ? `${nf.format(masquees)} communes sans aucune vente de ce type ${B_FENETRE.texte} ne sont pas affichées.` : ""}
+        ${masquees ? (masquees > 1
+          ? `${nf.format(masquees)} communes sans aucune vente de ce type ${B_FENETRE.texte} ne sont pas affichées.`
+          : `1 commune sans aucune vente de ce type ${B_FENETRE.texte} n'est pas affichée.`) : ""}
         ${totalSansTerrain ? `Terrain minimum : ${pluriel(totalSansTerrain, "vente")} sur ${nf.format(totalVentes)} ${totalSansTerrain > 1 ? "n'ont" : "n'a"} pas de terrain renseigné dans DVF ; ${totalSansTerrain > 1 ? "elles ne peuvent" : "elle ne peut"} pas être retenue${totalSansTerrain > 1 ? "s" : ""} (colonne « sans terrain connu »).` : ""}</p>
       <div class="table-wrap"><table>
         <thead><tr>
@@ -2044,6 +2063,10 @@ document.getElementById("b-type").addEventListener("change", e => {
 });
 for (const id of ["va-seuil-bas", "va-seuil-haut"])
   document.getElementById(id).addEventListener("change", () => {
+    // valeur hors limites (ex. +15 % pour « sous le marché ») : le champ affiche celle réellement utilisée
+    const s = lireSeuils();
+    document.getElementById("va-seuil-bas").value = s.seuilBas;
+    document.getElementById("va-seuil-haut").value = s.seuilHaut;
     if (document.getElementById("va-resultat").innerHTML) verifierAnnonce();
     rendreSuivies();   // les verdicts des annonces suivies dépendent aussi des seuils
   });
