@@ -1,0 +1,2165 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prix immobiliers au Mans</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --surface-2: #f0efec;
+    --text: #0b0b0b;
+    --text-2: #52514e;
+    --muted: #6f6d68;
+    --grid: #e1e0d9;
+    --axis: #c3c2b7;
+    --border: rgba(11, 11, 11, 0.10);
+    --accent: #2a78d6;
+    --context-line: #c9c7bf;
+    --warn-bg: #fff6e0;
+    --warn-border: #eda100;
+    --ok: #006300; --ko: #b42d2d;
+    --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a; --series-4: #eda100;
+    --series-5: #e87ba4; --series-6: #008300; --series-7: #6250d6; --series-8: #e34948;
+    /* Carte des prix : échelle séquentielle bleue (clair = moins cher, foncé = plus cher) */
+    --seq-1: #cde2fb; --seq-2: #9ec5f4; --seq-3: #6da7ec; --seq-4: #3987e5; --seq-5: #256abf; --seq-6: #104281;
+    --carte-vide: #e1e0d9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --page: #0d0d0d; --surface: #1a1a19; --surface-2: #262624;
+      --text: #f0efec; --text-2: #c3c2b7; --muted: #9a988f;
+      --grid: #2c2c2a; --axis: #383835; --border: rgba(255, 255, 255, 0.10);
+      --accent: #3987e5; --context-line: #3d3d3a;
+      --warn-bg: #2b2414; --warn-border: #c98500;
+      --ok: #0ca30c; --ko: #e66767;
+      --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500;
+      --series-5: #d55181; --series-6: #0ca30c; --series-7: #9085e9; --series-8: #e66767;
+      /* sombre : l'échelle s'inverse (proche du fond = moins cher, clair = plus cher) */
+      --seq-1: #104281; --seq-2: #1c5cab; --seq-3: #2a78d6; --seq-4: #5598e7; --seq-5: #86b6ef; --seq-6: #cde2fb;
+      --carte-vide: #383835;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --surface-2: #262624;
+    --text: #f0efec; --text-2: #c3c2b7; --muted: #9a988f;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255, 255, 255, 0.10);
+    --accent: #3987e5; --context-line: #3d3d3a;
+    --warn-bg: #2b2414; --warn-border: #c98500;
+    --ok: #0ca30c; --ko: #e66767;
+    --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500;
+    --series-5: #d55181; --series-6: #0ca30c; --series-7: #9085e9; --series-8: #e66767;
+    --seq-1: #104281; --seq-2: #1c5cab; --seq-3: #2a78d6; --seq-4: #5598e7; --seq-5: #86b6ef; --seq-6: #cde2fb;
+    --carte-vide: #383835;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--page); color: var(--text);
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  header { padding: 20px 16px 0; max-width: 1200px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sous-titre { color: var(--text-2); margin: 0 0 14px; }
+  main { max-width: 1200px; margin: 0 auto; padding: 0 16px 40px; }
+
+  nav.onglets { display: flex; gap: 4px; border-bottom: 1px solid var(--border); overflow-x: auto; }
+  nav.onglets button {
+    background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-2);
+    padding: 10px 14px; font: inherit; cursor: pointer; white-space: nowrap;
+  }
+  nav.onglets button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+  nav.onglets button:disabled { cursor: default; opacity: .55; }
+  nav.onglets button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  button.petit:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  /* titres de résultat rendus focalisables par script : pas de cadre au focus */
+  h2[tabindex="-1"]:focus, p[tabindex="-1"]:focus { outline: none; }
+
+  .avertissement {
+    background: var(--warn-bg); border-left: 4px solid var(--warn-border);
+    padding: 10px 14px; border-radius: 4px; margin: 16px 0; font-size: 14px;
+  }
+  .avertissement strong { display: block; margin-bottom: 2px; }
+
+  .carte {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 16px; margin-bottom: 16px;
+  }
+  .carte h2 { font-size: 17px; margin: 0 0 4px; }
+  .carte .aide { color: var(--text-2); font-size: 13px; margin: 0 0 12px; }
+
+  /* Filtres */
+  .filtres { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; }
+  .filtres label { font-size: 13px; color: var(--text-2); display: flex; flex-direction: column; gap: 4px; }
+  .filtres label.case { flex-direction: row; align-items: center; color: var(--text); font-size: 14px; }
+  select, input[type="search"], input[type="number"] {
+    font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--axis);
+    border-radius: 6px; padding: 6px 8px;
+  }
+  button.petit {
+    font: inherit; font-size: 13px; background: var(--surface-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; cursor: pointer;
+  }
+  .groupes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 24px; margin-top: 14px; }
+  fieldset { border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px 10px; margin: 0; min-width: 0; }
+  legend { font-size: 13px; font-weight: 600; padding: 0 4px; }
+  .liste-cases { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 2px 12px; }
+  .liste-cases label { font-size: 14px; display: flex; gap: 6px; align-items: center; }
+  .actions-groupe { display: flex; gap: 6px; margin-bottom: 6px; }
+  .ajout { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .ajout input { min-width: 240px; flex: 1; }
+
+  /* Tableau */
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { padding: 7px 10px; text-align: right; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+  th { font-size: 12px; color: var(--text-2); font-weight: 600; vertical-align: bottom; background: var(--surface); position: sticky; top: 0; }
+  th button { all: unset; cursor: pointer; }
+  th button:focus-visible { outline: 2px solid var(--accent); }
+  th.trie::after { content: " ▾"; }
+  th.trie.asc::after { content: " ▴"; }
+  td:first-child, th:first-child, .gauche { text-align: left; }
+  td { font-variant-numeric: tabular-nums; }
+  .n { color: var(--muted); font-size: 12px; }
+  .n.bloc { display: block; line-height: 1.2; }
+  .insuffisant { color: var(--muted); font-style: italic; font-size: 13px; }
+  .zone { color: var(--muted); font-size: 12px; }
+  tr.coeur-mans td:first-child { font-weight: 600; }
+  .etoile {
+    all: unset; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+    width: 24px; height: 24px; border-radius: 4px; margin-right: 4px; vertical-align: middle;
+  }
+  .etoile:focus-visible { outline: 2px solid var(--accent); }
+  .etoile .pastille { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--axis); }
+  .etoile[aria-pressed="true"] .pastille { border: none; }
+  .hausse { color: var(--text); }
+
+  /* Graphique */
+  .legende { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; margin: 0 0 8px; color: var(--text-2); }
+  .legende span { display: inline-flex; align-items: center; gap: 6px; }
+  .legende i { display: inline-block; width: 16px; height: 2px; border-radius: 1px; }
+  /* Carte des prix */
+  .legende-carte { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--text-2); margin: 10px 0 8px; font-variant-numeric: tabular-nums; }
+  .legende-carte span { display: inline-flex; align-items: center; gap: 6px; }
+  .legende-carte i { display: inline-block; width: 18px; height: 12px; border-radius: 2px; border: 1px solid var(--border); }
+  #c-carte { height: 520px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-2); }
+  @media (max-width: 600px) { #c-carte { height: 400px; } }
+  .graphique { position: relative; height: 380px; }
+  details { margin-top: 12px; font-size: 14px; }
+  summary { cursor: pointer; color: var(--accent); }
+
+  footer { margin-top: 24px; }
+  footer .carte { font-size: 14px; color: var(--text-2); }
+  footer h2 { color: var(--text); }
+  footer h3 { font-size: 14px; color: var(--text); margin: 14px 0 4px; }
+  footer ul { margin: 4px 0; padding-left: 20px; }
+  footer li { margin: 2px 0; }
+  footer a { color: var(--accent); }
+  .date-donnees { color: var(--text); font-size: 15px; margin: 4px 0 0; }
+  .erreur { color: #d03b3b; font-weight: 600; }
+
+  /* Module 3 */
+  .verdict { display: flex; flex-wrap: wrap; gap: 16px 32px; align-items: flex-start; }
+  .verdict .chiffre { font-size: 28px; font-weight: 650; line-height: 1.1; }
+  .verdict .libelle { font-size: 13px; color: var(--text-2); }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 15px;
+    padding: 4px 10px; border-radius: 999px; border: 1.5px solid currentColor;
+  }
+  .badge.sous { color: var(--ok); }
+  .badge.dans { color: var(--text-2); }
+  .badge.dessus { color: var(--ko); }
+  .note-elargi { border-left: 4px solid var(--accent); background: var(--surface-2); padding: 8px 12px; border-radius: 4px; margin: 12px 0 0; font-size: 14px; }
+  .reglette { position: relative; height: 46px; margin: 18px 4px 4px; }
+  .reglette .barre { position: absolute; top: 18px; left: 0; right: 0; height: 2px; background: var(--axis); }
+  .reglette .iq { position: absolute; top: 12px; height: 14px; background: var(--surface-2); border: 1px solid var(--axis); border-radius: 3px; }
+  .reglette .repere { position: absolute; top: 6px; width: 2px; height: 26px; background: var(--text-2); }
+  .reglette .annonce { position: absolute; top: 9px; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; background: var(--accent); border: 2px solid var(--surface); }
+  .jauge { display: inline-block; width: 90px; height: 8px; background: var(--surface-2); border-radius: 4px; vertical-align: middle; margin-right: 8px; overflow: hidden; }
+  .jauge i { display: block; height: 100%; background: var(--series-1); border-radius: 4px; }
+  .rang { color: var(--muted); font-size: 12px; margin-right: 6px; }
+  .reglette .txt { position: absolute; top: 32px; font-size: 12px; color: var(--text-2); transform: translateX(-50%); white-space: nowrap; }
+
+  @media (max-width: 600px) {
+    /* Téléphone : tous les onglets visibles (sur plusieurs lignes), sans barre de défilement */
+    nav.onglets { flex-wrap: wrap; overflow-x: visible; gap: 0 2px; }
+    nav.onglets button { padding: 8px 10px; }
+    /* Tableaux : la 1re colonne (commune…) reste visible quand on fait défiler le tableau
+       vers la droite ; les noms longs passent à la ligne, la zone en dessous */
+    .table-wrap th:first-child, .table-wrap td:first-child {
+      position: sticky; left: 0; z-index: 1; background: var(--surface);
+      white-space: normal; min-width: 135px; max-width: 165px;
+      box-shadow: 1px 0 0 var(--grid);
+    }
+    .table-wrap th:first-child { z-index: 2; }
+    .table-wrap td:first-child .zone { display: block; }
+    .graphique { height: 300px; }
+    h1 { font-size: 19px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Prix immobiliers au Mans et en Sarthe</h1>
+  <p class="sous-titre" id="sous-titre">Ventes réelles publiées par l'État (DVF).</p>
+  <nav class="onglets" role="tablist">
+    <button role="tab" aria-selected="true" data-cible="comparateur">Comparateur de communes</button>
+    <button role="tab" aria-selected="false" data-cible="verificateur">Vérificateur d'annonce</button>
+    <button role="tab" aria-selected="false" data-cible="budget">Budget → où acheter</button>
+    <button role="tab" aria-selected="false" data-cible="rendement">Rendement locatif</button>
+    <button role="tab" aria-selected="false" data-cible="carte">Carte des prix</button>
+  </nav>
+</header>
+
+<main>
+  <div class="avertissement" id="limites">
+    <strong>À garder en tête</strong>
+    DVF ne connaît ni l'état du bien, ni les travaux, ni le DPE : une médiane mélange biens rénovés et biens à rénover.
+    Les ventes des derniers mois ne sont pas encore publiées (<span id="fin-donnees">…</span>).
+    Les petites communes ont peu de ventes par an : leurs chiffres sont fragiles.
+    <strong id="rappel-maj" hidden style="margin-top:6px"></strong>
+  </div>
+
+  <section id="comparateur">
+    <div class="carte">
+      <h2>Communes et période</h2>
+      <p class="aide">Le Mans et ses 22 communes proches sont cochées par défaut. Ajoutez n'importe quelle commune de la Sarthe avec la recherche.</p>
+      <div class="filtres">
+        <label>Type de bien
+          <select id="type-bien">
+            <option value="maison" selected>Maisons</option>
+            <option value="appartement">Appartements</option>
+          </select>
+        </label>
+        <label>Année de début
+          <select id="annee-debut"></select>
+        </label>
+        <label>Année de fin
+          <select id="annee-fin"></select>
+        </label>
+        <label class="case"><input type="checkbox" id="cumul"> Médianes sur toutes les ventes de la période (utile pour les petites communes)</label>
+      </div>
+      <div class="groupes" id="groupes"></div>
+      <div class="ajout" style="margin-top:12px">
+        <input type="search" id="recherche" list="toutes-communes" placeholder="Ajouter une commune de la Sarthe…" aria-label="Ajouter une commune de la Sarthe">
+        <datalist id="toutes-communes"></datalist>
+        <button class="petit" id="bouton-ajout">Ajouter</button>
+        <span class="n" id="message-ajout" role="status"></span>
+      </div>
+    </div>
+
+    <div class="carte">
+      <h2 id="titre-tableau">Communes triées par prix médian au m²</h2>
+      <p class="aide" id="aide-tableau"></p>
+      <div class="table-wrap">
+        <table id="tableau">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="carte">
+      <h2>Prix médian au m² par année</h2>
+      <p class="aide">Cliquez sur la pastille d'une commune dans le tableau pour la mettre en couleur (8 au maximum). Les autres communes cochées restent en gris. Une année avec moins de 5 ventes n'a pas de point.</p>
+      <div class="legende" id="legende"></div>
+      <div class="graphique"><canvas id="graphique" aria-label="Prix médian au m² par année et par commune" role="img"></canvas></div>
+      <details>
+        <summary>Voir les données du graphique en tableau</summary>
+        <div class="table-wrap"><table id="tableau-annees"><thead></thead><tbody></tbody></table></div>
+      </details>
+    </div>
+  </section>
+
+  <!-- ================= Module 3 : vérificateur d'annonce ================= -->
+  <section id="verificateur" hidden>
+    <div class="carte">
+      <h2>L'annonce</h2>
+      <p class="aide">Ces informations restent dans la page et disparaissent en fermant l'onglet, sauf si vous cliquez sur « Suivre cette annonce » : elle est alors gardée dans ce navigateur seulement (jamais envoyée).</p>
+      <form id="form-annonce" class="filtres" autocomplete="off">
+        <label>Type de bien
+          <select id="va-type">
+            <option value="maison" selected>Maison</option>
+            <option value="appartement">Appartement</option>
+          </select>
+        </label>
+        <label>Commune
+          <input type="search" id="va-commune" list="toutes-communes" value="Le Mans (72181)" required style="min-width:230px">
+        </label>
+        <label>Prix affiché (€)
+          <input type="number" id="va-prix" min="10000" step="1000" required placeholder="ex. 220000">
+        </label>
+        <label>Surface habitable (m²)
+          <input type="number" id="va-surface" min="20" step="any" required placeholder="ex. 95">
+        </label>
+        <label id="va-terrain-champ">Terrain (m², optionnel)
+          <input type="number" id="va-terrain" min="0" step="any">
+        </label>
+        <label id="va-terrain-tol-champ">Comparer à
+          <select id="va-terrain-tol">
+            <option value="" selected>toutes les maisons</option>
+            <option value="0.25">maisons au terrain proche (±25 %)</option>
+            <option value="0.5">maisons au terrain proche (±50 %)</option>
+          </select>
+        </label>
+        <label>Pièces (optionnel)
+          <input type="number" id="va-pieces" min="1" step="1">
+        </label>
+        <label>Frais d'agence inclus dans le prix (€, optionnel)
+          <input type="number" id="va-agence" min="0" step="100" title="Les prix DVF n'incluent pas les frais d'agence payés par l'acheteur">
+        </label>
+        <label class="case"><input type="checkbox" id="va-ajuster"> <span id="va-ajuster-libelle">Ramener les prix des ventes à la dernière année</span></label>
+        <button class="petit" type="submit" style="padding:7px 16px">Vérifier</button>
+      </form>
+      <div class="filtres" style="margin-top:14px">
+        <span style="font-size:13px;color:var(--text-2)">Comparer avec :</span>
+        <label class="case"><input type="radio" name="va-mode" value="commune" checked> les ventes de la commune</label>
+        <label class="case" id="va-mode-rayon"><input type="radio" name="va-mode" value="rayon"> les ventes autour du bien (rayon)</label>
+        <span class="n" id="va-sans-carte" hidden>La recherche autour du bien (carte) n'est disponible que dans la version installée sur ordinateur.</span>
+        <label id="va-rayon-champ" hidden>Rayon
+          <select id="va-rayon">
+            <option value="300">300 m</option>
+            <option value="500" selected>500 m</option>
+            <option value="1000">1 km</option>
+            <option value="2000">2 km</option>
+          </select>
+        </label>
+      </div>
+      <div id="va-carte-bloc" hidden style="margin-top:12px">
+        <p class="aide">Cliquez sur la carte pour placer le bien (rien n'est envoyé ; le fond de carte IGN, lui, demande une connexion). Ou saisissez une adresse : elle sera
+          <strong>envoyée au service de géocodage de l'État</strong> (data.geopf.fr) au moment du clic sur « Placer l'adresse ».</p>
+        <div class="ajout" style="margin-bottom:8px">
+          <input type="search" id="va-adresse" placeholder="ex. 12 rue de la Paix, Le Mans" aria-label="Adresse du bien">
+          <button class="petit" type="button" id="va-geocoder">Placer l'adresse</button>
+          <span class="n" id="va-point-info" role="status">Aucun point placé.</span>
+        </div>
+        <div id="va-carte" style="height:340px;border-radius:6px;border:1px solid var(--border)"></div>
+      </div>
+      <details>
+        <summary>Réglages du verdict</summary>
+        <div class="filtres" style="margin-top:8px">
+          <label>« Sous le marché » en dessous de (%)
+            <input type="number" id="va-seuil-bas" value="-10" step="1" max="0">
+          </label>
+          <label>« Au-dessus du marché » au-delà de (%)
+            <input type="number" id="va-seuil-haut" value="10" step="1" min="0">
+          </label>
+        </div>
+      </details>
+    </div>
+
+    <div id="va-resultat"></div>
+
+    <div class="carte">
+      <h2>Annonces suivies</h2>
+      <p class="aide">Gardées uniquement dans ce navigateur, sur cet ordinateur : rien n'est envoyé ni écrit dans les fichiers du projet, l'adresse saisie n'est pas conservée.
+        Le verdict est recalculé avec les données actuelles : après une mise à jour DVF, comparez-le au verdict d'origine.</p>
+      <div id="va-suivies"></div>
+      <div class="ajout" style="margin-top:10px">
+        <button class="petit" type="button" id="va-suivies-sauver" hidden>Sauvegarder dans un fichier</button>
+        <button class="petit" type="button" id="va-suivies-restaurer">Restaurer depuis un fichier</button>
+        <input type="file" id="va-suivies-fichier" accept=".json,application/json" hidden>
+        <button class="petit" type="button" id="va-suivies-effacer" hidden>Tout effacer</button>
+        <span class="n" id="va-suivies-msg" role="status">La sauvegarde protège la liste si les données du navigateur sont effacées, ou pour la passer sur un autre ordinateur. Elle contient vos annonces : gardez-la hors du dossier du projet.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= Module 2 : budget → où acheter ================= -->
+  <section id="budget" hidden>
+    <div class="carte">
+      <h2>Votre budget</h2>
+      <p class="aide">Ces informations restent dans la page : elles ne sont enregistrées nulle part et disparaissent en fermant l'onglet.</p>
+      <form id="form-budget" class="filtres" autocomplete="off">
+        <label>Type de bien
+          <select id="b-type">
+            <option value="maison" selected>Maison</option>
+            <option value="appartement">Appartement</option>
+          </select>
+        </label>
+        <label>Budget total (€)
+          <input type="number" id="b-budget" min="10000" step="1000" required placeholder="ex. 250000">
+        </label>
+        <label class="case"><input type="checkbox" id="b-notaire" checked> Le budget inclut les frais de notaire</label>
+        <label id="b-taux-champ">Frais de notaire (%)
+          <input type="number" id="b-taux" value="7.5" min="0" max="15" step="0.1" style="width:90px">
+        </label>
+        <label>Surface habitable souhaitée (m², optionnel)
+          <input type="number" id="b-surface" min="9" step="any">
+        </label>
+        <label id="b-terrain-champ">Terrain minimum (m², optionnel)
+          <input type="number" id="b-terrain" min="0" step="any">
+        </label>
+        <label>Communes
+          <select id="b-perimetre">
+            <option value="coeur" selected>Le Mans + 22 communes proches</option>
+            <option value="sarthe">Toute la Sarthe</option>
+          </select>
+        </label>
+        <button class="petit" type="submit" style="padding:7px 16px">Calculer</button>
+      </form>
+    </div>
+    <div id="b-resultat"></div>
+  </section>
+
+  <!-- ================= Module 4 : rendement locatif ================= -->
+  <section id="rendement" hidden>
+    <div class="carte">
+      <h2>Le bien à louer</h2>
+      <p class="aide">Ces informations restent dans la page : elles ne sont enregistrées nulle part et disparaissent en fermant l'onglet.</p>
+      <form id="form-rendement" class="filtres" autocomplete="off">
+        <label>Type de bien
+          <select id="r-type">
+            <option value="maison" selected>Maison</option>
+            <option value="appartement">Appartement</option>
+          </select>
+        </label>
+        <label>Commune
+          <input type="search" id="r-commune" list="toutes-communes" value="Le Mans (72181)" required style="min-width:230px">
+        </label>
+        <label>Prix d'achat (€)
+          <input type="number" id="r-prix" min="10000" step="1000" required placeholder="ex. 150000">
+        </label>
+        <label class="case"><input type="checkbox" id="r-notaire" checked> Ajouter les frais de notaire</label>
+        <label>Frais de notaire (%)
+          <input type="number" id="r-taux" value="7.5" min="0" max="15" step="0.1" style="width:90px">
+        </label>
+        <label>Surface habitable (m²)
+          <input type="number" id="r-surface" min="9" step="any" required placeholder="ex. 80">
+        </label>
+        <label>Loyer mensuel visé (€, optionnel)
+          <input type="number" id="r-loyer" min="0" step="10" placeholder="sinon estimé">
+        </label>
+        <button class="petit" type="submit" style="padding:7px 16px">Calculer</button>
+      </form>
+    </div>
+    <div id="r-resultat"></div>
+
+    <div class="carte">
+      <h2 id="r-titre-classement">Rendement brut théorique par commune</h2>
+      <p class="aide" id="r-aide-classement"></p>
+      <div class="filtres" style="margin-bottom:10px">
+        <label>Communes
+          <select id="r-perimetre">
+            <option value="coeur" selected>Le Mans + 22 communes proches</option>
+            <option value="sarthe">Toute la Sarthe</option>
+          </select>
+        </label>
+      </div>
+      <div class="table-wrap"><table id="r-classement"><thead></thead><tbody></tbody></table></div>
+    </div>
+  </section>
+
+  <!-- ================= Carte des prix par commune ================= -->
+  <section id="carte" hidden>
+    <div class="carte">
+      <h2 id="c-titre">Prix médian au m² par commune</h2>
+      <p class="aide" id="c-aide"></p>
+      <div class="filtres">
+        <label>Type de bien
+          <select id="c-type">
+            <option value="maison" selected>Maisons</option>
+            <option value="appartement">Appartements</option>
+          </select>
+        </label>
+        <button class="petit" type="button" id="c-vue-mans">Centrer sur Le Mans</button>
+        <button class="petit" type="button" id="c-vue-sarthe">Toute la Sarthe</button>
+      </div>
+      <div class="legende-carte" id="c-legende" aria-label="Légende de la carte"></div>
+      <div id="c-carte" role="img" aria-label="Carte de la Sarthe : prix médian au m² par commune (le même contenu est disponible en tableau sous la carte)"></div>
+      <p class="n" id="c-info" style="margin-top:6px">Survolez une commune pour voir son prix médian, le nombre de ventes et la période.</p>
+      <details>
+        <summary>Voir les données de la carte en tableau</summary>
+        <div class="table-wrap"><table id="c-tableau"><thead></thead><tbody></tbody></table></div>
+      </details>
+    </div>
+  </section>
+
+  <footer>
+    <section class="carte" id="sources-limites" aria-labelledby="titre-sources">
+      <h2 id="titre-sources">Sources et limites</h2>
+      <div id="sources"></div>
+    </section>
+  </footer>
+</main>
+
+<script src="data/donnees.js"></script>
+<!-- Bibliothèques copiées dans app/lib/ (voir app/lib/LISEZMOI.md) : la page marche sans connexion -->
+<script src="lib/chart/chart.umd.js"></script>
+<link rel="stylesheet" href="lib/leaflet/leaflet.css">
+<script src="lib/leaflet/leaflet.js"></script>
+<script>
+"use strict";
+
+// ---------------------------------------------------------------------------
+// Données
+// ---------------------------------------------------------------------------
+const D = window.DONNEES;
+if (!D) {
+  document.querySelector("main").innerHTML =
+    '<p class="erreur">Données introuvables : lancer scripts/03_statistiques.py pour générer app/data/donnees.js.</p>';
+  throw new Error("donnees.js absent");
+}
+const SEUIL = D.meta.seuil_ventes;
+const ANNEES = D.meta.periode.annees;
+const DERNIERE = D.meta.periode.derniere_annee_complete;
+
+// Fenêtres glissantes comptées en mois depuis la dernière vente publiée (et non en années
+// complètes) : après la publication d'octobre, les ventes du premier semestre comptent aussi.
+const FIN_DONNEES = D.meta.periode.fin;   // « AAAA-MM-JJ »
+const NOMS_MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août",
+                   "septembre", "octobre", "novembre", "décembre"];
+const moisAnnee = iso => `${NOMS_MOIS[+iso.slice(5, 7) - 1]} ${iso.slice(0, 4)}`;
+function fenetreMois(nbMois) {
+  const [a, m] = FIN_DONNEES.split("-").map(Number);
+  // 1er jour du mois situé nbMois - 1 mois avant le mois de la dernière vente
+  const debut = new Date(Date.UTC(a, m - nbMois, 1)).toISOString().slice(0, 10);
+  return { debut, texte: `de ${moisAnnee(debut)} à ${moisAnnee(FIN_DONNEES)}`,
+           court: `${moisAnnee(debut)} – ${moisAnnee(FIN_DONNEES)}` };
+}
+const COMMUNES = D.communes;
+const PAR_CODE = Object.fromEntries(COMMUNES.map(c => [c.code, c]));
+const CODE_LE_MANS = "72181";
+const NB_SLOTS = 8;
+
+const TYPES = D.meta.types;   // ["maison", "appartement"] : toujours traités séparément
+const LIBELLE_TYPE = { maison: { un: "maison", des: "maisons" }, appartement: { un: "appartement", des: "appartements" } };
+
+// Ventes indexées par type puis par commune (format colonnes + lignes) : VENTES[type][code]
+const VENTES = (() => {
+  const i = Object.fromEntries(D.ventes.colonnes.map((c, k) => [c, k]));
+  const parType = Object.fromEntries(TYPES.map(t => [t, {}]));
+  for (const l of D.ventes.lignes) {
+    (parType[l[i.type]][l[i.code_insee]] ??= []).push({
+      date: l[i.date], annee: +l[i.date].slice(0, 4), code: l[i.code_insee], prix: l[i.prix],
+      surface: l[i.surface], terrain: l[i.terrain], pieces: l[i.pieces], prix_m2: l[i.prix_m2],
+      lat: l[i.latitude], lon: l[i.longitude],
+    });
+  }
+  return parType;
+})();
+
+// ---------------------------------------------------------------------------
+// Calculs (mêmes conventions que pandas : médiane et quantiles par interpolation linéaire)
+// ---------------------------------------------------------------------------
+function quantile(valeurs, q) {
+  const v = valeurs.filter(x => x !== null && x !== undefined).sort((a, b) => a - b);
+  if (!v.length) return null;
+  const pos = (v.length - 1) * q, bas = Math.floor(pos), haut = Math.ceil(pos);
+  return v[bas] + (v[haut] - v[bas]) * (pos - bas);
+}
+const arrondi = x => (x === null ? null : Math.round(x));
+
+function statsSurVentes(liste) {
+  const n = liste.length;
+  if (n < SEUIL) return { n };
+  const terrains = liste.map(v => v.terrain).filter(t => t !== null);
+  return {
+    n,
+    prix_median: arrondi(quantile(liste.map(v => v.prix), .5)),
+    prix_m2_median: arrondi(quantile(liste.map(v => v.prix_m2), .5)),
+    surface_mediane: arrondi(quantile(liste.map(v => v.surface), .5)),
+    terrain_median: terrains.length >= SEUIL ? arrondi(quantile(terrains, .5)) : null,
+    prix_m2_q1: arrondi(quantile(liste.map(v => v.prix_m2), .25)),
+    prix_m2_q3: arrondi(quantile(liste.map(v => v.prix_m2), .75)),
+  };
+}
+
+function statsAnnee(code, annee, type = etat.type) {
+  const s = D.stats[type];
+  return (s[code] && s[code][String(annee)]) || { n: 0 };
+}
+
+function statsCommune(code) {
+  if (!etat.cumul) return statsAnnee(code, etat.fin);
+  const liste = (VENTES[etat.type][code] || []).filter(v => v.annee >= etat.debut && v.annee <= etat.fin);
+  return statsSurVentes(liste);
+}
+
+function evolution(code) {
+  if (etat.debut === etat.fin) return { aucune: true };
+  const a = statsAnnee(code, etat.debut), b = statsAnnee(code, etat.fin);
+  if (!a.prix_m2_median || !b.prix_m2_median) return { insuffisant: true, na: a.n, nb: b.n };
+  return { pct: (b.prix_m2_median - a.prix_m2_median) / a.prix_m2_median * 100, na: a.n, nb: b.n };
+}
+
+// ---------------------------------------------------------------------------
+// État de la page
+// ---------------------------------------------------------------------------
+const etat = {
+  selection: new Set(COMMUNES.filter(c => c.zone !== "sarthe").map(c => c.code)),
+  type: "maison",                    // type de bien du comparateur
+  ajoutees: [],                      // communes « sarthe » ajoutées par la recherche
+  debut: ANNEES[0],
+  fin: DERNIERE,
+  cumul: false,
+  slots: new Map([[CODE_LE_MANS, 0]]), // commune mise en avant -> numéro de couleur (fixe)
+  tri: { cle: "prix_m2_median", desc: true },
+};
+
+// ---------------------------------------------------------------------------
+// Mise en forme
+// ---------------------------------------------------------------------------
+const nf = new Intl.NumberFormat("fr-FR");
+const euros = x => nf.format(x) + " €";
+const pluriel = (n, mots) => `${nf.format(n)} ${n > 1 ? mots.split(" ").map(m => m + "s").join(" ") : mots}`;
+const INSUFFISANT = '<span class="insuffisant">données insuffisantes</span>';
+const LIBELLE_ZONE = { limitrophe: "limitrophe", couronne: "couronne", sarthe: "Sarthe" };
+
+function couleurSlot(slot) {
+  return getComputedStyle(document.documentElement).getPropertyValue(`--series-${slot + 1}`).trim();
+}
+function css(nom) { return getComputedStyle(document.documentElement).getPropertyValue(nom).trim(); }
+
+function periodeTexte() {
+  if (etat.cumul) return etat.debut === etat.fin ? `${etat.fin}` : `${etat.debut} à ${etat.fin} cumulées`;
+  return `${etat.fin}`;
+}
+
+// ---------------------------------------------------------------------------
+// Filtres
+// ---------------------------------------------------------------------------
+function construireFiltres() {
+  const selDebut = document.getElementById("annee-debut");
+  const selFin = document.getElementById("annee-fin");
+  for (const a of ANNEES) {
+    selDebut.add(new Option(a, a, false, a === etat.debut));
+    selFin.add(new Option(a, a, false, a === etat.fin));
+  }
+  selDebut.onchange = () => { etat.debut = +selDebut.value; if (etat.debut > etat.fin) { etat.fin = etat.debut; selFin.value = etat.fin; } rendre(); };
+  selFin.onchange = () => { etat.fin = +selFin.value; if (etat.fin < etat.debut) { etat.debut = etat.fin; selDebut.value = etat.debut; } rendre(); };
+  document.getElementById("cumul").onchange = e => { etat.cumul = e.target.checked; rendre(); };
+  document.getElementById("type-bien").onchange = e => { etat.type = e.target.value; rendre(); };
+
+  const dl = document.getElementById("toutes-communes");
+  const tri = [...COMMUNES].sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
+  for (const c of tri) dl.append(new Option(`${c.nom} (${c.code})`));
+  const ajouter = () => {
+    const champ = document.getElementById("recherche");
+    const msg = document.getElementById("message-ajout");
+    const m = champ.value.match(/\((\d{5})\)\s*$/);
+    let c = m ? PAR_CODE[m[1]] : null;
+    if (!c) {
+      const exacts = COMMUNES.filter(x => x.nom.toLowerCase() === champ.value.trim().toLowerCase());
+      if (exacts.length === 1) c = exacts[0];
+    }
+    if (!c) { msg.textContent = "Commune non trouvée : choisissez-la dans la liste proposée."; return; }
+    etat.selection.add(c.code);
+    if (c.zone === "sarthe" && !etat.ajoutees.includes(c.code)) etat.ajoutees.push(c.code);
+    champ.value = ""; msg.textContent = `${c.nom} ajoutée.`;
+    construireGroupes(); rendre();
+  };
+  document.getElementById("bouton-ajout").onclick = ajouter;
+  document.getElementById("recherche").addEventListener("keydown", e => { if (e.key === "Enter") ajouter(); });
+}
+
+function construireGroupes() {
+  const groupes = [
+    ["Le Mans et communes limitrophes", COMMUNES.filter(c => c.zone === "limitrophe")],
+    ["Couronne", COMMUNES.filter(c => c.zone === "couronne")],
+  ];
+  if (etat.ajoutees.length) groupes.push(["Autres communes de la Sarthe", etat.ajoutees.map(c => PAR_CODE[c])]);
+  const conteneur = document.getElementById("groupes");
+  conteneur.innerHTML = "";
+  for (const [titre, liste] of groupes) {
+    const fs = document.createElement("fieldset");
+    fs.innerHTML = `<legend>${titre}</legend>`;
+    const actions = document.createElement("div");
+    actions.className = "actions-groupe";
+    for (const [lib, val] of [["Tout cocher", true], ["Tout décocher", false]]) {
+      const b = document.createElement("button");
+      b.className = "petit"; b.textContent = lib; b.type = "button";
+      b.onclick = () => { liste.forEach(c => val ? etat.selection.add(c.code) : etat.selection.delete(c.code)); construireGroupes(); rendre(); };
+      actions.append(b);
+    }
+    fs.append(actions);
+    const cases = document.createElement("div");
+    cases.className = "liste-cases";
+    for (const c of liste) {
+      const l = document.createElement("label");
+      const cb = document.createElement("input");
+      cb.type = "checkbox"; cb.checked = etat.selection.has(c.code);
+      cb.onchange = () => { cb.checked ? etat.selection.add(c.code) : etat.selection.delete(c.code); rendre(); };
+      l.append(cb, c.nom);
+      cases.append(l);
+    }
+    fs.append(cases);
+    conteneur.append(fs);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Mise en avant (couleurs fixes par commune, jamais réattribuées tant qu'elle reste en avant)
+// ---------------------------------------------------------------------------
+function basculerMiseEnAvant(code) {
+  if (etat.slots.has(code)) { etat.slots.delete(code); }
+  else {
+    const pris = new Set(etat.slots.values());
+    const libre = [...Array(NB_SLOTS).keys()].find(s => !pris.has(s));
+    if (libre === undefined) { alerteDouce("8 communes au maximum en couleur : retirez-en une d'abord."); return; }
+    etat.slots.set(code, libre);
+  }
+  rendre();
+}
+let alerteEnCours = null;   // { minuterie, ancien } : un seul message à la fois
+function alerteDouce(texte) {
+  const p = document.getElementById("aide-tableau");
+  // si un message est déjà affiché, on garde le texte d'origine (et non le message)
+  const ancien = alerteEnCours ? alerteEnCours.ancien : p.textContent;
+  if (alerteEnCours) clearTimeout(alerteEnCours.minuterie);
+  p.textContent = texte;
+  alerteEnCours = { ancien, minuterie: setTimeout(() => { p.textContent = ancien; alerteEnCours = null; }, 3500) };
+}
+
+// ---------------------------------------------------------------------------
+// Tableau principal
+// ---------------------------------------------------------------------------
+const COLONNES = [
+  { cle: "nom", titre: "Commune" },
+  { cle: "n", titre: "Ventes" },
+  { cle: "prix_median", titre: "Prix médian" },
+  { cle: "prix_m2_median", titre: "Prix médian au m²" },
+  { cle: "q", titre: "1er – 3e quartile<br>au m²", triable: false },
+  { cle: "surface_mediane", titre: "Surface médiane" },
+  { cle: "terrain_median", titre: "Terrain médian" },
+  { cle: "evol", titre: "Évolution du prix au m²" },
+];
+
+function rendreTableau() {
+  const avecTerrain = etat.type === "maison";   // pas de terrain pour un appartement
+  // à faire AVANT le tri : sinon le premier affichage après le passage aux appartements
+  // serait trié sur une colonne qui n'existe plus
+  if (!avecTerrain && etat.tri.cle === "terrain_median") etat.tri = { cle: "prix_m2_median", desc: true };
+  const codes = [...etat.selection];
+  const lignes = codes.map(code => ({ code, c: PAR_CODE[code], s: statsCommune(code), e: evolution(code) }));
+  const val = (l, cle) => cle === "nom" ? l.c.nom : cle === "evol" ? (l.e.pct ?? null) : (l.s[cle] ?? null);
+  const { cle, desc } = etat.tri;
+  lignes.sort((a, b) => {
+    const va = val(a, cle), vb = val(b, cle);
+    if (va === null && vb === null) return a.c.nom.localeCompare(b.c.nom, "fr");
+    if (va === null) return 1;
+    if (vb === null) return -1;
+    const r = typeof va === "string" ? va.localeCompare(vb, "fr") : va - vb;
+    return desc ? -r : r;
+  });
+
+  const colonnes = COLONNES.filter(col => avecTerrain || col.cle !== "terrain_median");
+  const libEvol = etat.debut === etat.fin ? "Évolution du prix au m²" : `Évolution prix au m²<br>${etat.debut} → ${etat.fin}`;
+  const thead = document.querySelector("#tableau thead");
+  thead.innerHTML = "<tr>" + colonnes.map(col => {
+    const titre = col.cle === "evol" ? libEvol : col.cle === "n" ? `Ventes (${periodeTexte()})` : col.titre;
+    if (col.triable === false) return `<th>${titre}</th>`;
+    const cls = col.cle === cle ? `trie${desc ? "" : " asc"}` : "";
+    return `<th class="${cls}" aria-sort="${col.cle === cle ? (desc ? "descending" : "ascending") : "none"}"><button data-cle="${col.cle}">${titre}</button></th>`;
+  }).join("") + "</tr>";
+  thead.querySelectorAll("button").forEach(b => b.onclick = () => {
+    const k = b.dataset.cle;
+    etat.tri = { cle: k, desc: etat.tri.cle === k ? !etat.tri.desc : k !== "nom" };
+    rendreTableau();
+  });
+
+  const tbody = document.querySelector("#tableau tbody");
+  tbody.innerHTML = "";
+  for (const l of lignes) {
+    const { s, e, c } = l;
+    const ok = s.prix_m2_median != null;
+    const slot = etat.slots.get(l.code);
+    const tr = document.createElement("tr");
+    if (c.zone !== "sarthe") tr.className = "coeur-mans";
+    let evol;
+    if (e.aucune) evol = '<span class="n">choisir 2 années</span>';
+    else if (e.insuffisant) evol = INSUFFISANT + `<span class="n bloc">${nf.format(e.na)} → ${nf.format(e.nb)} ventes</span>`;
+    else evol = `${e.pct > 0 ? "+" : ""}${e.pct.toFixed(1).replace(".", ",")} %<span class="n bloc">${nf.format(e.na)} → ${nf.format(e.nb)} ventes</span>`;
+    tr.innerHTML = `
+      <td><button class="etoile" aria-pressed="${slot !== undefined}" title="${slot !== undefined ? "Retirer la couleur dans le graphique" : "Mettre en couleur dans le graphique"}">
+            <span class="pastille" style="${slot !== undefined ? `background:${couleurSlot(slot)}` : ""}"></span></button>${c.nom}
+          <span class="zone">${LIBELLE_ZONE[c.zone]}</span></td>
+      <td>${nf.format(s.n)}</td>
+      <td>${ok ? euros(s.prix_median) : INSUFFISANT}</td>
+      <td>${ok ? euros(s.prix_m2_median) : INSUFFISANT}</td>
+      <td>${ok ? `${nf.format(s.prix_m2_q1)} – ${nf.format(s.prix_m2_q3)} €` : ""}</td>
+      <td>${ok ? nf.format(s.surface_mediane) + " m²" : ""}</td>
+      ${avecTerrain ? `<td>${ok ? (s.terrain_median != null ? nf.format(s.terrain_median) + " m²" : INSUFFISANT) : ""}</td>` : ""}
+      <td>${evol}</td>`;
+    tr.querySelector(".etoile").onclick = () => basculerMiseEnAvant(l.code);
+    tbody.append(tr);
+  }
+  if (!lignes.length) tbody.innerHTML = `<tr><td colspan="${colonnes.length}" class="insuffisant">Aucune commune cochée.</td></tr>`;
+
+  const des = LIBELLE_TYPE[etat.type].des;
+  const nInsuffisant = lignes.filter(l => l.s.prix_m2_median == null).length;
+  document.getElementById("titre-tableau").textContent =
+    `Communes triées par prix médian au m² – ${des} vendus en ${periodeTexte()}`.replace("maisons vendus", "maisons vendues");
+  document.getElementById("aide-tableau").textContent =
+    `Médianes calculées sur les ventes ${des === "maisons" ? "de maisons" : "d'appartements"} ${etat.cumul ? `de ${etat.debut} à ${etat.fin} (toutes années cumulées)` : `de l'année ${etat.fin}`}. ` +
+    `Sous ${SEUIL} ventes, la médiane n'est pas affichée. ` +
+    (avecTerrain ? "Le terrain médian porte sur les ventes où un terrain est renseigné. " : "") +
+    (nInsuffisant ? `${nf.format(nInsuffisant)} commune${nInsuffisant > 1 ? "s" : ""} sur ${nf.format(lignes.length)} ${nInsuffisant > 1 ? "ont" : "a"} moins de ${SEUIL} ventes sur cette période` +
+      (etat.cumul ? ". " : " : cocher « Médianes sur toutes les ventes de la période » peut aider. ") : "") +
+    `L'évolution compare les médianes de ${etat.debut} et ${etat.fin}, chacune sur ses propres ventes.`;
+}
+
+// ---------------------------------------------------------------------------
+// Graphique
+// ---------------------------------------------------------------------------
+let graphique = null;
+// Écran étroit (téléphone) : pas de place pour les noms en bout de courbe ; la légende
+// au-dessus du graphique nomme déjà les communes en couleur.
+const ECRAN_ETROIT = matchMedia("(max-width: 600px)");
+
+// Étiquettes directes en bout de courbe (communes en couleur), avec écartement simple
+const etiquettesFin = {
+  id: "etiquettesFin",
+  afterDatasetsDraw(chart) {
+    if (ECRAN_ETROIT.matches) return;
+    const { ctx, chartArea } = chart;
+    const items = [];
+    chart.data.datasets.forEach((ds, i) => {
+      if (!ds.enAvant) return;
+      const meta = chart.getDatasetMeta(i);
+      let k = ds.data.length - 1;
+      while (k >= 0 && ds.data[k] === null) k--;
+      if (k < 0 || !meta.data[k]) return;
+      items.push({ x: meta.data[k].x, y: meta.data[k].y, texte: ds.label });
+    });
+    items.sort((a, b) => a.y - b.y);
+    for (let i = 1; i < items.length; i++) if (items[i].y - items[i - 1].y < 14) items[i].y = items[i - 1].y + 14;
+    ctx.save();
+    ctx.font = "12px system-ui, -apple-system, 'Segoe UI', sans-serif";
+    ctx.fillStyle = css("--text-2");
+    ctx.textBaseline = "middle";
+    for (const it of items) ctx.fillText(it.texte, Math.max(it.x + 8, chartArea.left), it.y);
+    ctx.restore();
+  },
+};
+
+function donneesGraphique() {
+  const enAvant = [...etat.selection].filter(c => etat.slots.has(c));
+  const gris = [...etat.selection].filter(c => !etat.slots.has(c));
+  const serie = code => ANNEES.map(a => statsAnnee(code, a).prix_m2_median ?? null);
+  const surface = css("--surface");
+  const datasets = [];
+  for (const code of gris) {
+    datasets.push({
+      label: PAR_CODE[code].nom, code, data: serie(code), enAvant: false,
+      borderColor: css("--context-line"), borderWidth: 1, pointRadius: 0, pointHoverRadius: 0,
+      spanGaps: false, tension: 0,
+    });
+  }
+  for (const code of enAvant.sort((a, b) => etat.slots.get(a) - etat.slots.get(b))) {
+    const coul = couleurSlot(etat.slots.get(code));
+    datasets.push({
+      label: PAR_CODE[code].nom, code, data: serie(code), enAvant: true,
+      borderColor: coul, backgroundColor: coul, borderWidth: 2,
+      pointRadius: 4, pointHoverRadius: 6, pointBorderColor: surface, pointBorderWidth: 2,
+      spanGaps: false, tension: 0,
+    });
+  }
+  return datasets;
+}
+
+function rendreGraphique() {
+  const datasets = donneesGraphique();
+  const enAvant = datasets.filter(d => d.enAvant);
+  document.getElementById("legende").innerHTML =
+    enAvant.map(d => `<span><i style="background:${d.borderColor}"></i>${d.label}</span>`).join("") +
+    (datasets.length > enAvant.length ? `<span><i style="background:${css("--context-line")}"></i>autres communes cochées</span>` : "");
+
+  if (!window.Chart) {
+    document.querySelector(".graphique").innerHTML =
+      '<p class="insuffisant">Graphique indisponible (fichier app/lib/chart/chart.umd.js introuvable). Les données restent lisibles dans le tableau ci-dessous.</p>';
+  } else {
+    const grille = css("--grid"), texte = css("--muted");
+    const options = {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      layout: { padding: { right: ECRAN_ETROIT.matches ? 8 : 140, top: 8 } },
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        x: { grid: { display: false }, border: { color: css("--axis") }, ticks: { color: texte } },
+        y: {
+          grid: { color: grille }, border: { display: false },
+          ticks: { color: texte, callback: v => nf.format(v) + " €" },
+          title: { display: true, text: "€/m² (médiane)", color: texte },
+        },
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          filter: item => item.dataset.enAvant,
+          itemSort: (a, b) => (b.raw ?? -1) - (a.raw ?? -1),
+          callbacks: {
+            title: items => items.length ? `Année ${items[0].label}` : "",
+            label: item => {
+              const s = statsAnnee(item.dataset.code, item.label);
+              return item.raw === null
+                ? ` ${item.dataset.label} : données insuffisantes (${pluriel(s.n, "vente")})`
+                : ` ${item.dataset.label} : ${euros(item.raw)}/m² (${pluriel(s.n, "vente")})`;
+            },
+          },
+        },
+      },
+    };
+    if (graphique) { graphique.data.datasets = datasets; graphique.options = options; graphique.update(); }
+    else {
+      graphique = new Chart(document.getElementById("graphique"), {
+        type: "line", data: { labels: ANNEES.map(String), datasets }, options, plugins: [etiquettesFin],
+      });
+    }
+  }
+
+  // Vue tableau du graphique : toutes les communes cochées, toutes les années
+  const codes = [...etat.selection].sort((a, b) => PAR_CODE[a].nom.localeCompare(PAR_CODE[b].nom, "fr"));
+  document.querySelector("#tableau-annees thead").innerHTML =
+    "<tr><th>Commune</th>" + ANNEES.map(a => `<th>${a}</th>`).join("") + "</tr>";
+  document.querySelector("#tableau-annees tbody").innerHTML = codes.map(code =>
+    `<tr><td>${PAR_CODE[code].nom}</td>` + ANNEES.map(a => {
+      const s = statsAnnee(code, a);
+      return s.prix_m2_median != null
+        ? `<td>${euros(s.prix_m2_median)} <span class="n">(${nf.format(s.n)})</span></td>`
+        : `<td>${INSUFFISANT} <span class="n">(${nf.format(s.n)})</span></td>`;
+    }).join("") + "</tr>").join("");
+}
+
+// ---------------------------------------------------------------------------
+// En-tête, sources
+// ---------------------------------------------------------------------------
+// Textes tirés de meta.json (calculés par 03_statistiques.py, jamais écrits en dur)
+const pct1 = x => `${x > 0 ? "+" : ""}${x.toFixed(1).replace(".", ",")} %`;
+function texteSansCoordonnees(type) {
+  const p = D.meta.sans_coordonnees_pct || {};
+  const t = x => `${x.toFixed(1).replace(".", ",")} %`;
+  const de = k => (k === "appartement" ? "d'" : "de ") + LIBELLE_TYPE[k].des;   // « de maisons », « d'appartements »
+  if (type) return p[type] != null ? `${t(p[type])} des ventes ${de(type)}` : "quelques ventes";
+  return TYPES.filter(k => p[k] != null).map(k => `${t(p[k])} des ventes ${de(k)}`).join(" et ") || "quelques ventes";
+}
+function texteControle() {
+  const c = D.meta.controle_le_mans || {};
+  const parties = TYPES.filter(k => c[k]).map(k => {
+    const e = c[k];
+    return `${e.ecart_min_pct === e.ecart_max_pct ? pct1(e.ecart_min_pct) : `de ${pct1(e.ecart_min_pct)} à ${pct1(e.ecart_max_pct)}`} pour les ${LIBELLE_TYPE[k].des}`;
+  });
+  if (!parties.length) return "";
+  const a = c[TYPES.find(k => c[k])].annees;
+  return ` : au Mans, écart ${parties.join(", ")} (années ${a[0]} à ${a[1]})`;
+}
+
+function rendreMeta() {
+  const m = D.meta;
+  const date = iso => new Date(iso + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  document.getElementById("sous-titre").textContent =
+    `Ventes réelles de logements anciens publiées par l'État (DVF), du ${date(m.periode.debut)} au ${date(m.periode.fin)} – ` +
+    `${nf.format(m.nb_ventes.maison)} maisons et ${nf.format(m.nb_ventes.appartement)} appartements en Sarthe.`;
+  document.getElementById("fin-donnees").textContent = `les données s'arrêtent au ${date(m.periode.fin)}`;
+  const [jour, heure] = m.genere_le.split(" ");
+  const genere = `${date(jour)} à ${heure.replace(":", " h ")}`;
+  document.getElementById("sous-titre").textContent += ` Données mises à jour le ${genere}.`;
+  const lien = (url, texte) => url ? `<a href="${url}" target="_blank" rel="noopener">${texte}</a>` : texte;
+  document.getElementById("sources").innerHTML = `
+    <p class="date-donnees"><strong>Données du ${date(m.periode.debut)} au ${date(m.periode.fin)}</strong>
+      (dernière année complète : ${m.periode.derniere_annee_complete}) – mises à jour le ${genere}.</p>
+    <p>DVF est publié deux fois par an (avril et octobre environ). Pour mettre à jour : <code>python scripts/00_tout_regenerer.py</code>, puis recharger la page.</p>
+
+    <h3>Limites à garder en tête</h3>
+    <ul>
+      <li>Les ventes des derniers mois ne sont pas encore publiées : rien après le ${date(m.periode.fin)}.</li>
+      <li>DVF ne connaît ni l'état du bien, ni les travaux, ni le DPE : une médiane mélange biens rénovés et biens à rénover.</li>
+      <li>Petites communes : peu de ventes par an, chiffres fragiles. Aucune médiane n'est affichée sous ${m.seuil_ventes} ventes (« données insuffisantes »).</li>
+      <li>Les prix DVF n'incluent ni les frais de notaire, ni les frais d'agence payés par l'acheteur.</li>
+      <li>Sont exclues : les ventes sur plan (neuf), les ventes de plusieurs logements d'un coup, les ventes mêlant logement et local commercial, les adjudications et échanges.</li>
+      <li>Loyers : loyers d'annonce (${m.loyers.periode}, ${m.loyers.unite}), estimés par un modèle pour un bien type (${Object.values(m.loyers.bien_type).join(", ")}). Ce ne sont pas des loyers signés.</li>
+      <li>Recherche par rayon : ${texteSansCoordonnees()} n'ont pas de coordonnées dans DVF et n'y sont pas prises en compte.</li>
+    </ul>
+
+    <h3>Méthode</h3>
+    <ul>${m.regles.map(r => `<li>${r.charAt(0).toUpperCase() + r.slice(1)}.</li>`).join("")}
+      <li>Toujours la médiane (jamais la moyenne), calculée vente par vente sur le prix au m² ; le nombre de ventes et la période sont affichés à côté de chaque chiffre.</li>
+      <li>Médianes contrôlées avec les agrégats publiés par Terralyse${texteControle()}.</li>
+    </ul>
+
+    <h3>Sources (Licence Ouverte 2.0)</h3>
+    <ul>
+      ${m.sources.map(s => `<li>${lien(s.page, s.source)} – téléchargé le ${date(s.telecharge_le)}${s.source.startsWith("DVF") ? " (DGFiP, Etalab)" : ""}${s.source.includes("Terralyse") || s.source.startsWith("Prix immobilier") || s.source.startsWith("Loyers, prix") ? " – Source : Terralyse, utilisé pour les contrôles" : ""}</li>`).join("")}
+      <li>Loyers : ${m.loyers.mention}.</li>
+      <li>Fond de carte et géocodage d'adresse : Géoplateforme de l'IGN. Contours des communes (carte des prix) : API Géo, simplifiés à environ 30 m.</li>
+    </ul>`;
+}
+
+function rendre() {
+  rendreTableau();
+  rendreGraphique();
+}
+
+// ---------------------------------------------------------------------------
+// Onglets
+// ---------------------------------------------------------------------------
+const BOUTONS_ONGLETS = [...document.querySelectorAll("nav.onglets button[data-cible]")];
+const ONGLETS = BOUTONS_ONGLETS.map(b => b.dataset.cible);
+
+// Accessibilité (motif « onglets » du W3C) : chaque onglet est relié à son panneau, et seul
+// l'onglet actif est dans l'ordre de tabulation ; les flèches passent d'un onglet à l'autre.
+for (const b of BOUTONS_ONGLETS) {
+  const panneau = document.getElementById(b.dataset.cible);
+  b.id = `onglet-${b.dataset.cible}`;
+  b.setAttribute("aria-controls", b.dataset.cible);
+  b.tabIndex = b.getAttribute("aria-selected") === "true" ? 0 : -1;
+  panneau.setAttribute("role", "tabpanel");
+  panneau.setAttribute("aria-labelledby", b.id);
+}
+
+function afficherOnglet(cible, { focus = false } = {}) {
+  for (const b of BOUTONS_ONGLETS) {
+    const actif = b.dataset.cible === cible;
+    b.setAttribute("aria-selected", actif);
+    b.tabIndex = actif ? 0 : -1;
+    if (actif && focus) b.focus();
+    document.getElementById(b.dataset.cible).hidden = !actif;
+  }
+  // l'onglet ouvert apparaît dans l'adresse (#carte…) : on peut le garder en favori
+  try { history.replaceState(null, "", cible === ONGLETS[0] ? location.pathname + location.search : `#${cible}`); } catch { /* sans effet */ }
+  if (cible === "comparateur" && graphique) graphique.resize();
+  if (cible === "carte") afficherCartePrix();   // carte créée à la première ouverture de l'onglet
+}
+BOUTONS_ONGLETS.forEach(b => b.onclick = () => afficherOnglet(b.dataset.cible));
+document.querySelector("nav.onglets").addEventListener("keydown", e => {
+  const i = ONGLETS.indexOf(e.target.dataset?.cible);
+  if (i < 0) return;
+  const cible = { ArrowRight: ONGLETS[(i + 1) % ONGLETS.length], ArrowLeft: ONGLETS[(i - 1 + ONGLETS.length) % ONGLETS.length],
+                  Home: ONGLETS[0], End: ONGLETS[ONGLETS.length - 1] }[e.key];
+  if (!cible) return;
+  e.preventDefault();
+  afficherOnglet(cible, { focus: true });
+});
+
+// Après un calcul lancé par l'utilisateur, le focus va sur le titre du résultat (ou le message
+// d'erreur) : un lecteur d'écran l'annonce, et la page défile jusqu'à lui.
+function focaliserResultat(idConteneur) {
+  const cible = document.querySelector(`#${idConteneur} h2, #${idConteneur} .erreur`);
+  if (!cible) return;
+  cible.tabIndex = -1;
+  cible.focus();
+}
+
+// ---------------------------------------------------------------------------
+// Module 3 – Vérificateur d'annonce
+// ---------------------------------------------------------------------------
+const COMP_FENETRE = fenetreMois(36);           // 36 derniers mois publiés
+const COMP_TOLERANCES = [0.20, 0.30];           // surface ±20 %, puis ±30 %
+const COMP_MAX_VOISINES = 5;                    // élargissement : 5 communes au plus
+const SURFACE_MIN = D.meta.surface_min;         // seuils du nettoyage (02_nettoyer.py), via meta.json
+
+function trouverCommune(texte) {
+  const m = texte.match(/\((\d{5})\)\s*$/);
+  if (m && PAR_CODE[m[1]]) return PAR_CODE[m[1]];
+  const t = texte.trim().toLowerCase();
+  const exacts = COMMUNES.filter(c => c.nom.toLowerCase() === t);
+  return exacts.length === 1 ? exacts[0] : null;
+}
+
+function distanceKm(a, b) {
+  const R = 6371, rad = x => x * Math.PI / 180;
+  const dLat = rad(b.lat - a.lat), dLon = rad(b.lon - a.lon);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+// Communes les plus proches (distance entre centres), dans la même zone (décision du 18/11/2026)
+function voisines(c) {
+  return COMMUNES.filter(x => x.zone === c.zone && x.code !== c.code && x.lat != null)
+    .map(x => ({ commune: x, km: distanceKm(c, x) }))
+    .sort((a, b) => a.km - b.km);
+}
+
+// okTerrain : filtre facultatif sur le terrain (par défaut, toutes les ventes passent)
+const TOUT_TERRAIN = () => true;
+function ventesComparables(codes, surface, tol, type, okTerrain = TOUT_TERRAIN) {
+  return codes.flatMap(code => (VENTES[type][code] || []).filter(v =>
+    v.date >= COMP_FENETRE.debut && Math.abs(v.surface - surface) <= tol * surface && okTerrain(v)));
+}
+
+function chercherComparables(c, surface, type, okTerrain = TOUT_TERRAIN) {
+  const etapes = [];
+  for (const tol of COMP_TOLERANCES) {
+    const comp = ventesComparables([c.code], surface, tol, type, okTerrain);
+    etapes.push({ tol, n: comp.length, voisines: [] });
+    if (comp.length >= SEUIL) return { comp, tol, voisines: [], etapes };
+  }
+  const tol = COMP_TOLERANCES[COMP_TOLERANCES.length - 1];
+  const ajoutees = [];
+  let comp = [];
+  // on ne retient que les voisines où il existe au moins une vente de ce type (utile pour les appartements)
+  const candidates = voisines(c).filter(v => (VENTES[type][v.commune.code] || []).length);
+  for (const v of candidates.slice(0, COMP_MAX_VOISINES)) {
+    ajoutees.push(v);
+    comp = ventesComparables([c.code, ...ajoutees.map(x => x.commune.code)], surface, tol, type, okTerrain);
+    if (comp.length >= SEUIL) break;
+  }
+  etapes.push({ tol, n: comp.length, voisines: [...ajoutees] });
+  return { comp, tol, voisines: ajoutees, etapes };
+}
+
+const pct = (x, signe = true) => `${signe && x > 0 ? "+" : ""}${x.toFixed(1).replace(".", ",")} %`;
+const dateFr = iso => iso.split("-").reverse().join("/");
+// Texte saisi par l'utilisateur (nom d'une annonce suivie…) : jamais interprété comme du HTML
+const echapper = s => String(s ?? "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+
+// ---------------------------------------------------------------------------
+// Option « ramener les prix à la dernière année complète »
+// Chaque vente comparable est multipliée par l'évolution de la médiane du prix au m²
+// entre son année et DERNIERE. Médiane prise sur la commune de la vente si elle a au moins
+// INDICE_MIN_VENTES ventes chaque année, sinon sur un ensemble de communes plus large.
+// ---------------------------------------------------------------------------
+const INDICE_MIN_VENTES = 30;
+const cacheMedianes = new Map(), cacheIndices = new Map();
+
+function medianesParAnnee(type, nom, codes) {
+  const cle = `${type}|${nom}`;
+  if (!cacheMedianes.has(cle)) {
+    const parAnnee = {};
+    for (const code of codes) for (const v of VENTES[type][code] || []) (parAnnee[v.annee] ??= []).push(v.prix_m2);
+    cacheMedianes.set(cle, Object.fromEntries(Object.entries(parAnnee).map(([a, l]) => [a, { med: quantile(l, .5), n: l.length }])));
+  }
+  return cacheMedianes.get(cle);
+}
+
+function indicePrix(type, code) {
+  const cle = `${type}|${code}`;
+  if (cacheIndices.has(cle)) return cacheIndices.get(cle);
+  const c = PAR_CODE[code];
+  const annees = ANNEES.filter(a => a >= +COMP_FENETRE.debut.slice(0, 4) && a <= DERNIERE);
+  const candidats = [
+    { nom: c.nom, codes: [code] },
+    c.zone !== "sarthe"
+      ? { nom: "Le Mans et ses 22 communes proches", codes: COMMUNES.filter(x => x.zone !== "sarthe").map(x => x.code) }
+      : { nom: "Sarthe hors Le Mans et ses 22 communes proches", codes: COMMUNES.filter(x => x.zone === "sarthe").map(x => x.code) },
+    { nom: "toute la Sarthe", codes: COMMUNES.map(x => x.code) },
+  ];
+  let indice = null;
+  for (const cand of candidats) {
+    const m = medianesParAnnee(type, cand.nom, cand.codes);
+    if (annees.every(a => m[a] && m[a].n >= INDICE_MIN_VENTES)) {
+      indice = { nom: cand.nom, facteurs: Object.fromEntries(annees.map(a => [a, m[DERNIERE].med / m[a].med])) };
+      break;
+    }
+  }
+  cacheIndices.set(cle, indice);
+  return indice;
+}
+
+function texteAjustement(res) {
+  if (!res.a.ajuster) return "";
+  const des = LIBELLE_TYPE[res.type].des;
+  const parties = res.indices.slice(0, 3).map(idx => `${echapper(idx.nom)} (` +
+    Object.entries(idx.facteurs).filter(([an]) => +an < DERNIERE).map(([an, f]) => `${an} → ${DERNIERE} : ${pct((f - 1) * 100)}`).join(", ") + ")");
+  const recentes = res.comp.some(v => v.annee > DERNIERE);
+  return `<p class="note-elargi"><strong>Prix ramenés à ${DERNIERE}.</strong> Le prix au m² de chaque vente est multiplié par l'évolution
+    de la médiane du prix au m² des ${des} entre son année et ${DERNIERE}${parties.length ? ` : ${parties.join(" ; ")}${res.indices.length > 3 ? " ; …" : ""}` : ""}.
+    Médiane de la commune de la vente si elle compte au moins ${INDICE_MIN_VENTES} ventes chaque année, sinon d'un ensemble de communes plus large.
+    ${recentes ? `Les ventes postérieures à ${DERNIERE} ne sont pas ajustées. ` : ""}C'est une approximation : l'évolution d'une médiane reflète aussi les changements dans les biens vendus.</p>`;
+}
+
+// ---------------------------------------------------------------------------
+// Lecture du formulaire et analyse (séparées de l'affichage : servent aussi aux annonces suivies)
+// ---------------------------------------------------------------------------
+function lireAnnonce() {
+  const val = id => { const x = document.getElementById(id).value; return x === "" ? null : +x; };
+  const type = document.getElementById("va-type").value;
+  const mode = document.querySelector('input[name="va-mode"]:checked').value;
+  return {
+    type, commune: document.getElementById("va-commune").value,
+    prix: val("va-prix"), surface: val("va-surface"),
+    terrain: type === "maison" ? val("va-terrain") : null,
+    pieces: val("va-pieces"), agence: val("va-agence") || 0,
+    terrainTol: type === "maison" ? val("va-terrain-tol") : null,
+    ajuster: document.getElementById("va-ajuster").checked,
+    mode, rayon: +document.getElementById("va-rayon").value,
+    // le point n'est gardé qu'en mode rayon (jamais l'adresse saisie)
+    point: mode === "rayon" && carteEtat.point ? { lat: carteEtat.point.lat, lon: carteEtat.point.lon } : null,
+  };
+}
+
+function lireSeuils() {
+  const v = id => { const x = document.getElementById(id).value; return x === "" ? null : +x; };
+  return { seuilBas: v("va-seuil-bas") ?? -10, seuilHaut: v("va-seuil-haut") ?? 10 };
+}
+
+function classerVerdict(ecart, { seuilBas, seuilHaut }) {
+  return ecart < seuilBas ? ["sous", "▼", "Sous le marché"]
+    : ecart > seuilHaut ? ["dessus", "▲", "Au-dessus du marché"] : ["dans", "●", "Dans le marché"];
+}
+
+function analyserAnnonce(a) {
+  const type = a.type, surfaceMin = SURFACE_MIN[type];
+  const c = trouverCommune(a.commune || "");
+  const modeRayon = a.mode === "rayon";
+  if (!modeRayon && !c) return { erreur: "Commune non trouvée : choisissez-la dans la liste proposée." };
+  if (modeRayon && !a.point) return { erreur: "Placez d'abord le bien sur la carte (clic ou adresse)." };
+  if (!a.prix || !a.surface || a.surface < surfaceMin || a.prix - a.agence <= 0)
+    return { erreur: `Indiquez au moins un prix et une surface habitable (${surfaceMin} m² minimum).` };
+  // Filtre facultatif : comparer seulement aux maisons dont le terrain est proche de celui de l'annonce
+  if (a.terrainTol && !a.terrain) return { erreur: "Indiquez le terrain de l'annonce pour comparer aux maisons au terrain proche." };
+  const okTerrain = a.terrainTol
+    ? v => v.terrain != null && Math.abs(v.terrain - a.terrain) <= a.terrainTol * a.terrain   // terrain inconnu : exclue
+    : TOUT_TERRAIN;
+  const terrainTxt = a.terrainTol
+    ? `, terrain de ${nf.format(Math.round(a.terrain * (1 - a.terrainTol)))} à ${nf.format(Math.round(a.terrain * (1 + a.terrainTol)))} m² (±${a.terrainTol * 100} % ; ventes sans terrain connu exclues)`
+    : "";
+
+  const prixNet = a.prix - a.agence, pm2 = prixNet / a.surface;
+  let comp, tol, communesTxt, note = "", rayonFinal = null;
+  if (modeRayon) {
+    const r = chercherComparablesRayon(a.point, a.surface, type, a.rayon, okTerrain);
+    ({ comp, tol } = r);
+    rayonFinal = r.rayon;
+    communesTxt = `dans un rayon de ${distanceTxt(r.rayon)} autour du point placé`;
+    if (r.etapes.length > 1) {
+      note = `<p class="note-elargi"><strong>Recherche élargie.</strong> ` + r.etapes.map(e =>
+        `Rayon ${distanceTxt(e.rayon)}, surface ±${e.tol * 100} % : ${pluriel(e.n, "vente")}.`).join(" ") + "</p>";
+    }
+    note += `<p class="n">Ventes sans coordonnées dans DVF (${texteSansCoordonnees(type)}) : non prises en compte dans la recherche par rayon.</p>`;
+  } else {
+    const r = chercherComparables(c, a.surface, type, okTerrain);
+    ({ comp, tol } = r);
+    const ajoutees = r.voisines, etapes = r.etapes;
+    communesTxt = "à " + [c.nom, ...ajoutees.map(v => `${v.commune.nom} (${nf.format(Math.round(v.km))} km)`)].join(", ");
+    if (tol > COMP_TOLERANCES[0] || ajoutees.length) {
+      const lignes = [`À ${c.nom}, surface à ±${COMP_TOLERANCES[0] * 100} % : ${pluriel(etapes[0].n, "vente")} seulement.`];
+      if (etapes[1]) lignes.push(`Surface élargie à ±${COMP_TOLERANCES[1] * 100} % : ${pluriel(etapes[1].n, "vente")}.`);
+      if (ajoutees.length) lignes.push(`Recherche élargie aux communes les plus proches de la même zone : ${ajoutees.map(v => `${v.commune.nom} (${nf.format(Math.round(v.km))} km)`).join(", ")}.`);
+      note = `<p class="note-elargi"><strong>Recherche élargie.</strong> ${lignes.join(" ")}</p>`;
+    }
+  }
+
+  // Prix au m² utilisé pour comparer (pm2c) : brut, ou ramené à DERNIERE si l'option est cochée.
+  // Copies : les ventes de VENTES ne sont jamais modifiées.
+  const indices = new Map();
+  comp = comp.map(v => {
+    let facteur = 1;
+    if (a.ajuster && v.annee <= DERNIERE) {
+      const idx = indicePrix(type, v.code);
+      if (idx) { facteur = idx.facteurs[v.annee] ?? 1; indices.set(idx.nom, idx); }
+    }
+    return { ...v, pm2c: a.ajuster ? Math.round(v.prix_m2 * facteur) : v.prix_m2 };
+  });
+
+  const res = { a, c, type, modeRayon, comp, tol, communesTxt, note, terrainTxt, prixNet, pm2, rayonFinal,
+                indices: [...indices.values()] };
+  if (comp.length < SEUIL) return { ...res, insuffisant: true };
+  const valeurs = comp.map(v => v.pm2c);
+  const med = quantile(valeurs, .5), q1 = quantile(valeurs, .25), q3 = quantile(valeurs, .75);
+  return { ...res, valeurs, med, q1, q3, ecart: (pm2 - med) / med * 100 };
+}
+
+// ---------------------------------------------------------------------------
+// Affichage du résultat
+// ---------------------------------------------------------------------------
+let dernierResultat = null;   // pour « Suivre cette annonce » et l'export des comparables
+
+function blocSuivre() {
+  return `<div class="ajout" style="margin-top:12px">
+      <input type="text" id="va-suivre-nom" maxlength="80" placeholder="Nom de l'annonce (facultatif), ex. maison rue des Lilas" aria-label="Nom de l'annonce">
+      <button class="petit" type="button" id="va-suivre">Suivre cette annonce</button>
+      <span class="n" id="va-suivre-msg" role="status">Enregistrée seulement dans ce navigateur.</span>
+    </div>`;
+}
+
+function verifierAnnonce(e) {
+  if (e) e.preventDefault();
+  const sortie = document.getElementById("va-resultat");
+  const res = analyserAnnonce(lireAnnonce());
+  if (res.erreur) { dernierResultat = null; sortie.innerHTML = `<div class="carte"><p class="erreur">${res.erreur}</p></div>`; return; }
+  dernierResultat = res;
+  if (res.modeRayon) afficherComparablesCarte(res.comp, res.rayonFinal);
+  const { a, type, comp, tol, pm2, prixNet } = res;
+  const periode = COMP_FENETRE.texte;   // « de janvier 2023 à décembre 2025 »
+  const rappel = `<p class="aide" style="margin-top:12px">Rappel : DVF ne connaît ni l'état du bien, ni les travaux à prévoir, ni le DPE. Un bien à rénover et un bien refait à neuf comptent pareil dans la médiane : à vous d'ajuster selon la visite. Les prix DVF n'incluent pas les frais d'agence payés par l'acheteur ni les frais de notaire.</p>`;
+
+  if (res.insuffisant) {
+    sortie.innerHTML = `<div class="carte"><h2>Résultat</h2>
+      <p>${INSUFFISANT} : ${pluriel(comp.length, "vente comparable")} ${periode}${res.terrainTxt}, même après élargissement. Pas de verdict possible.${a.terrainTol ? " Essayez « Comparer à : toutes les maisons »." : ""}</p>${res.note}${rappel}${blocSuivre()}</div>` +
+      listeComparables(res);
+    return;
+  }
+
+  const { med, q1, q3, ecart, valeurs } = res;
+  const seuils = lireSeuils();
+  // Position de l'annonce parmi les comparables (utile pour un bien à rénover, où le verdict est attendu)
+  const plusCheres = comp.filter(v => v.pm2c > pm2).length;
+  const moinsCheres = comp.filter(v => v.pm2c < pm2).length;
+  const position = plusCheres >= moinsCheres
+    // arrondi vers le bas : « 100 % » seulement si c'est vraiment toutes les ventes
+    ? `Moins chère au m² que ${Math.floor(plusCheres / comp.length * 100)} % des ${nf.format(comp.length)} ventes comparables (${nf.format(plusCheres)} ventes).`
+    : `Plus chère au m² que ${Math.floor(moinsCheres / comp.length * 100)} % des ${nf.format(comp.length)} ventes comparables (${nf.format(moinsCheres)} ventes).`;
+  const [cls, icone, libelle] = classerVerdict(ecart, seuils);
+  const ajusteTxt = a.ajuster ? ` (prix ramenés à ${DERNIERE})` : "";
+
+  // Réglette : 1er–3e quartile, médiane, annonce
+  const mini = Math.min(quantile(valeurs, .05), pm2), maxi = Math.max(quantile(valeurs, .95), pm2);
+  const marge = (maxi - mini) * 0.08 || 100;
+  const pos = x => `${((x - (mini - marge)) / ((maxi + marge) - (mini - marge)) * 100).toFixed(2)}%`;
+  const reglette = `
+    <div class="reglette" aria-hidden="true">
+      <div class="barre"></div>
+      <div class="iq" style="left:${pos(q1)}; width:calc(${pos(q3)} - ${pos(q1)})"></div>
+      <div class="repere" style="left:${pos(med)}"></div>
+      <div class="annonce" style="left:${pos(pm2)}"></div>
+      <div class="txt" style="left:${pos(med)}">médiane ${euros(Math.round(med))}</div>
+    </div>
+    <p class="n">Bande grise : la moitié centrale des comparables (de ${euros(Math.round(q1))} à ${euros(Math.round(q3))}/m²${ajusteTxt}). Point bleu : l'annonce.</p>`;
+
+  // Terrain et pièces : contexte, pas de filtre
+  const contexte = [];
+  if (a.terrain !== null) {
+    const t = comp.map(v => v.terrain).filter(x => x !== null);
+    contexte.push(t.length >= SEUIL
+      ? `Terrain : ${nf.format(a.terrain)} m² pour l'annonce, médiane des comparables ${nf.format(Math.round(quantile(t, .5)))} m² (${pluriel(t.length, "vente")} avec terrain renseigné).`
+      : `Terrain : ${nf.format(a.terrain)} m² pour l'annonce ; trop peu de comparables avec terrain renseigné pour comparer.`);
+  }
+  if (a.pieces !== null) {
+    const p = comp.map(v => v.pieces).filter(x => x);
+    contexte.push(p.length >= SEUIL
+      ? `Pièces : ${a.pieces} pour l'annonce, médiane des comparables ${nf.format(Math.round(quantile(p, .5)))} (${pluriel(p.length, "vente")}).`
+      : `Pièces : trop peu de comparables avec nombre de pièces renseigné.`);
+  }
+
+  sortie.innerHTML = `
+    <div class="carte">
+      <h2>Résultat</h2>
+      <p class="aide">${pluriel(comp.length, "vente comparable")} : ${LIBELLE_TYPE[type].des} de ${nf.format(Math.round(a.surface * (1 - tol)))} à ${nf.format(Math.round(a.surface * (1 + tol)))} m² (±${tol * 100} %)${res.terrainTxt}, vendues ${periode} ${res.communesTxt}.</p>
+      <div class="verdict">
+        <div><div class="libelle">Prix au m² de l'annonce${a.agence ? " (hors frais d'agence)" : ""}</div><div class="chiffre">${euros(Math.round(pm2))}</div>
+             <div class="n">${euros(prixNet)} ÷ ${nf.format(a.surface)} m²</div></div>
+        <div><div class="libelle">Médiane des comparables${ajusteTxt}</div><div class="chiffre">${euros(Math.round(med))}</div>
+             <div class="n">sur ${pluriel(comp.length, "vente")}, ${COMP_FENETRE.court}</div></div>
+        <div><div class="libelle">Écart</div><div class="chiffre">${pct(ecart)}</div>
+             <div style="margin-top:4px"><span class="badge ${cls}"><span aria-hidden="true">${icone}</span>${libelle}</span></div></div>
+        <div><div class="libelle">Prix médian du marché pour ${nf.format(a.surface)} m²</div><div class="chiffre">${euros(Math.round(med * a.surface / 1000) * 1000)}</div>
+             <div class="n">moitié centrale : ${euros(Math.round(q1 * a.surface / 1000) * 1000)} à ${euros(Math.round(q3 * a.surface / 1000) * 1000)}</div></div>
+      </div>
+      <p style="margin:14px 0 0"><strong>${position}</strong></p>
+      ${reglette}
+      <p class="n">Verdict : « sous le marché » sous ${pct(seuils.seuilBas)}, « au-dessus » au-delà de ${pct(seuils.seuilHaut)} (modifiable dans les réglages).</p>
+      ${contexte.length ? `<p>${contexte.join("<br>")}</p>` : ""}
+      ${texteAjustement(res)}
+      ${res.note}
+      ${rappel}
+      ${blocSuivre()}
+    </div>` + listeComparables(res);
+}
+
+// Comparables triés par proximité de surface (même ordre à l'écran et dans l'export)
+function trierComparables(res) {
+  return [...res.comp].sort((x, y) => Math.abs(x.surface - res.a.surface) - Math.abs(y.surface - res.a.surface) || y.date.localeCompare(x.date));
+}
+
+function listeComparables(res) {
+  const { comp, type, modeRayon: avecDistance } = res;
+  if (!comp.length) return "";
+  const surface = res.a.surface, avecTerrain = type === "maison", ajuste = res.a.ajuster;
+  return `<div class="carte"><h2>Les ventes comparables</h2>
+    <p class="aide">Triées par proximité de surface avec l'annonce.${avecDistance ? " Points orange sur la carte (survol pour le détail)." : ""}</p>
+    <div class="ajout" style="margin-bottom:10px">
+      <button class="petit" type="button" id="va-copier">Copier le tableau</button>
+      <button class="petit" type="button" id="va-csv">Télécharger (CSV)</button>
+      <span class="n" id="va-export-msg" role="status">Pour un tableur : appuyer une offre sur des ventes réelles.</span>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Date</th><th class="gauche">Commune</th>${avecDistance ? "<th>Distance</th>" : ""}<th>Prix</th><th>Surface</th><th>Écart de surface</th>${avecTerrain ? "<th>Terrain</th>" : ""}<th>Pièces</th><th>Prix au m²</th>${ajuste ? `<th>Prix au m²<br>ramené à ${DERNIERE}</th>` : ""}</tr></thead>
+      <tbody>${trierComparables(res).map(v => `<tr>
+        <td>${dateFr(v.date)}</td><td class="gauche">${PAR_CODE[v.code].nom}</td>${avecDistance ? `<td>${distanceTxt(Math.round(v.dist / 10) * 10)}</td>` : ""}<td>${euros(v.prix)}</td>
+        <td>${nf.format(v.surface)} m²</td><td class="n">${pct((v.surface - surface) / surface * 100)}</td>
+        ${avecTerrain ? `<td>${v.terrain != null ? nf.format(v.terrain) + " m²" : "–"}</td>` : ""}<td>${v.pieces || "–"}</td>
+        <td>${euros(v.prix_m2)}</td>${ajuste ? `<td>${euros(v.pm2c)}</td>` : ""}</tr>`).join("")}</tbody>
+    </table></div></div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Export des comparables (copie pour un tableur, ou fichier CSV) : données DVF publiques seulement
+// ---------------------------------------------------------------------------
+function tableauComparables(res) {
+  const avecDistance = res.modeRayon, avecTerrain = res.type === "maison", ajuste = res.a.ajuster;
+  const entetes = ["Date", "Commune", "Code INSEE", ...(avecDistance ? ["Distance (m)"] : []), "Prix (€)", "Surface (m²)",
+    "Écart de surface (%)", ...(avecTerrain ? ["Terrain (m²)"] : []), "Pièces", "Prix au m² (€)",
+    ...(ajuste ? [`Prix au m² ramené à ${DERNIERE} (€)`] : [])];
+  const lignes = trierComparables(res).map(v => [dateFr(v.date), PAR_CODE[v.code].nom, v.code,
+    ...(avecDistance ? [Math.round(v.dist)] : []), v.prix, v.surface,
+    Math.round((v.surface - res.a.surface) / res.a.surface * 1000) / 10,
+    ...(avecTerrain ? [v.terrain ?? ""] : []), v.pieces || "", v.prix_m2, ...(ajuste ? [v.pm2c] : [])]);
+  return { entetes, lignes };
+}
+// nombres à la française (virgule décimale) pour être reconnus par un tableur en français
+const texteCellule = x => typeof x === "number" ? String(x).replace(".", ",") : String(x ?? "");
+const celluleCsv = x => { const s = texteCellule(x); return /[;"\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+
+function messageExport(texte) { const m = document.getElementById("va-export-msg"); if (m) m.textContent = texte; }
+
+async function copierComparables() {
+  if (!dernierResultat) return;
+  const t = tableauComparables(dernierResultat);
+  const tsv = [t.entetes, ...t.lignes].map(l => l.map(x => texteCellule(x).replace(/[\t\r\n]/g, " ")).join("\t")).join("\n");
+  try {
+    await navigator.clipboard.writeText(tsv);
+  } catch {
+    // repli : sélection d'une zone de texte invisible puis copie
+    const zone = Object.assign(document.createElement("textarea"), { value: tsv });
+    zone.style.position = "fixed"; zone.style.opacity = "0";
+    document.body.append(zone); zone.select();
+    const ok = document.execCommand && document.execCommand("copy");
+    zone.remove();
+    if (!ok) { messageExport("Copie impossible ici : utilisez « Télécharger (CSV) »."); return; }
+  }
+  messageExport(`${pluriel(t.lignes.length, "vente")} copiées : collez-les dans un tableur.`);
+}
+
+// Fait télécharger un fichier créé dans la page (rien n'est envoyé : le fichier est fabriqué sur place)
+function telechargerFichier(contenu, typeMime, nom) {
+  const lien = Object.assign(document.createElement("a"), {
+    href: URL.createObjectURL(new Blob([contenu], { type: typeMime })), download: nom,
+  });
+  document.body.append(lien); lien.click(); lien.remove();
+  setTimeout(() => URL.revokeObjectURL(lien.href), 2000);
+}
+const aujourdhui = () => new Date().toISOString().slice(0, 10);
+
+function telechargerComparables() {
+  if (!dernierResultat) return;
+  const t = tableauComparables(dernierResultat);
+  // BOM + « ; » + CRLF : ouverture directe et correcte dans Excel en français
+  const csv = "\uFEFF" + [t.entetes, ...t.lignes].map(l => l.map(celluleCsv).join(";")).join("\r\n") + "\r\n";
+  const lieu = dernierResultat.modeRayon ? `rayon-${distanceTxt(dernierResultat.rayonFinal)}` : dernierResultat.c.nom;
+  const slug = lieu.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const nom = `ventes-comparables_${slug}_${aujourdhui()}.csv`;
+  telechargerFichier(csv, "text/csv;charset=utf-8", nom);
+  messageExport(`Fichier ${nom} téléchargé (${pluriel(t.lignes.length, "vente")}).`);
+}
+
+// ---------------------------------------------------------------------------
+// Annonces suivies : enregistrées UNIQUEMENT dans le stockage local de ce navigateur
+// (jamais dans un fichier du projet, jamais envoyées). L'adresse saisie n'est pas gardée.
+// ---------------------------------------------------------------------------
+const CLE_SUIVIES = "outil-immo-dvf.annonces-suivies.v1";
+
+const FORMAT_SAUVEGARDE = "outil-immo-dvf.annonces-suivies";
+const RAYONS = [300, 500, 1000, 2000], TOLERANCES_TERRAIN = [0.25, 0.5];
+const DATE_ISO = /^\d{4}-\d{2}-\d{2}$/;
+
+// Contrôle et remise en forme d'une annonce suivie (lue dans le navigateur ou dans un fichier
+// de sauvegarde) : seules les valeurs attendues sont gardées ; null si elle est inutilisable.
+function nettoyerSuivie(s) {
+  if (!s || typeof s !== "object" || !s.annonce || typeof s.annonce !== "object") return null;
+  const a = s.annonce;
+  const nombre = x => (x === null || x === undefined || x === "" ? null : Number.isFinite(+x) ? +x : NaN);
+  const type = TYPES.includes(a.type) ? a.type : null;
+  const prix = nombre(a.prix), surface = nombre(a.surface);
+  if (!type || !(prix > 0) || !(surface > 0)) return null;
+  const mode = a.mode === "rayon" ? "rayon" : "commune";
+  let point = null;
+  if (mode === "rayon") {
+    const lat = nombre(a.point?.lat), lon = nombre(a.point?.lon);
+    // valeurs vides refusées (Math.abs(null) vaudrait 0 et passerait le contrôle)
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+    point = { lat, lon };
+  }
+  const positif = x => { const n = nombre(x); return n > 0 ? n : null; };
+  const annonce = {
+    type, commune: String(a.commune ?? "").slice(0, 120), prix, surface,
+    terrain: type === "maison" ? positif(a.terrain) : null, pieces: positif(a.pieces),
+    agence: nombre(a.agence) >= 0 ? nombre(a.agence) : 0,
+    terrainTol: type === "maison" && TOLERANCES_TERRAIN.includes(nombre(a.terrainTol)) ? nombre(a.terrainTol) : null,
+    ajuster: a.ajuster === true, mode, rayon: RAYONS.includes(nombre(a.rayon)) ? nombre(a.rayon) : 500, point,
+  };
+  // verdict d'origine : gardé seulement s'il est complet (sinon affiché « inconnu »)
+  const v = s.verdict;
+  let verdict = null;
+  if (v && typeof v === "object" && DATE_ISO.test(v.donnees) && Number.isInteger(v.n) && v.n >= 0) {
+    if (v.insuffisant === true) verdict = { insuffisant: true, n: v.n, donnees: v.donnees };
+    else if (Number.isFinite(v.ecart) && Number.isFinite(v.med)) verdict = { n: v.n, med: v.med, ecart: v.ecart, donnees: v.donnees };
+  }
+  return {
+    id: typeof s.id === "string" && /^[\w-]{1,40}$/.test(s.id) ? s.id : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    nom: String(s.nom ?? "").slice(0, 80), annonce,
+    enregistreLe: DATE_ISO.test(s.enregistreLe) ? s.enregistreLe : new Date().toISOString().slice(0, 10),
+    verdict,
+  };
+}
+
+function lireSuivies() {
+  try {
+    const l = JSON.parse(localStorage.getItem(CLE_SUIVIES) || "[]");
+    return Array.isArray(l) ? l.map(nettoyerSuivie).filter(Boolean) : [];
+  } catch { return []; }
+}
+function ecrireSuivies(liste) {
+  try {
+    if (liste.length) localStorage.setItem(CLE_SUIVIES, JSON.stringify(liste));
+    else localStorage.removeItem(CLE_SUIVIES);
+    return true;
+  } catch { return false; }
+}
+
+function resumeVerdict(res) {
+  return res.insuffisant
+    ? { insuffisant: true, n: res.comp.length, donnees: FIN_DONNEES }
+    : { n: res.comp.length, med: Math.round(res.med), ecart: Math.round(res.ecart * 10) / 10, donnees: FIN_DONNEES };
+}
+
+function suivreAnnonce() {
+  if (!dernierResultat) return;
+  const msg = document.getElementById("va-suivre-msg");
+  const nom = document.getElementById("va-suivre-nom").value.trim().slice(0, 80);
+  const liste = lireSuivies();
+  liste.push({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, nom, annonce: dernierResultat.a,
+               enregistreLe: new Date().toISOString().slice(0, 10), verdict: resumeVerdict(dernierResultat) });
+  if (ecrireSuivies(liste)) {
+    msg.textContent = "Annonce enregistrée dans ce navigateur : voir « Annonces suivies » plus bas.";
+    document.getElementById("va-suivre-nom").value = "";
+  } else {
+    msg.textContent = "Enregistrement impossible : ce navigateur bloque le stockage local (navigation privée ?).";
+  }
+  rendreSuivies();
+}
+
+function texteVerdictCourt(v) {
+  if (!v) return `<span class="n">inconnu</span>`;
+  if (v.insuffisant) return `${INSUFFISANT} <span class="n bloc">${pluriel(v.n, "vente comparable")}</span>`;
+  const [cls, icone] = classerVerdict(v.ecart, lireSeuils());
+  return `<span class="badge ${cls}" style="font-size:13px;padding:2px 8px"><span aria-hidden="true">${icone}</span>${pct(v.ecart)}</span>` +
+    `<span class="n bloc">médiane ${euros(v.med)}/m², ${pluriel(v.n, "vente")}</span>`;
+}
+
+function rendreSuivies() {
+  const liste = lireSuivies();
+  const zone = document.getElementById("va-suivies");
+  const effacer = document.getElementById("va-suivies-effacer");
+  effacer.hidden = !liste.length;
+  document.getElementById("va-suivies-sauver").hidden = !liste.length;
+  if (!liste.length) {
+    zone.innerHTML = `<p class="n">Aucune annonce suivie. Après une vérification, donnez-lui un nom (facultatif) et cliquez sur « Suivre cette annonce ».</p>`;
+    return;
+  }
+  zone.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th class="gauche">Annonce</th><th class="gauche">Bien</th><th>Verdict à l'enregistrement</th><th>Verdict avec les données actuelles</th><th></th></tr></thead>
+    <tbody>${liste.map(s => {
+      const a = s.annonce, c = trouverCommune(a.commune || "");
+      const lieu = a.mode === "rayon" ? `rayon de ${distanceTxt(a.rayon)} autour d'un point` : (c ? c.nom : echapper(a.commune));
+      const options = [a.terrainTol ? `terrain ±${a.terrainTol * 100} %` : "", a.ajuster ? `prix ramenés à l'année` : ""].filter(Boolean).join(", ");
+      const res = analyserAnnonce(a);
+      const actuel = res.erreur ? `<span class="erreur">${res.erreur}</span>` : texteVerdictCourt(resumeVerdict(res));
+      const nouvelles = s.verdict && s.verdict.donnees !== FIN_DONNEES
+        ? `<span class="n bloc"><strong>nouvelles données</strong> (jusqu'au ${dateFr(FIN_DONNEES)})</span>` : "";
+      return `<tr>
+        <td class="gauche" style="white-space:normal;min-width:140px">${s.nom ? `<strong>${echapper(s.nom)}</strong>` : `<span class="n">sans nom</span>`}<span class="n bloc">enregistrée le ${dateFr(s.enregistreLe)}</span></td>
+        <td class="gauche" style="white-space:normal;min-width:200px">${LIBELLE_TYPE[a.type].un}, ${lieu}<span class="n bloc">${euros(a.prix)}, ${nf.format(a.surface)} m²${a.terrain ? `, terrain ${nf.format(a.terrain)} m²` : ""}${options ? ` ; ${options}` : ""}</span></td>
+        <td>${texteVerdictCourt(s.verdict)}${s.verdict ? `<span class="n bloc">données jusqu'au ${dateFr(s.verdict.donnees)}</span>` : ""}</td>
+        <td>${actuel}${nouvelles}</td>
+        <td><button class="petit" type="button" data-afficher="${s.id}">Afficher</button>
+            <button class="petit" type="button" data-supprimer="${s.id}">Supprimer</button></td>
+      </tr>`;
+    }).join("")}</tbody></table></div>`;
+}
+
+// Recharge une annonce suivie dans le formulaire et relance la vérification
+function afficherSuivie(id) {
+  const s = lireSuivies().find(x => x.id === id);
+  if (!s) return;
+  const a = s.annonce, set = (champ, v) => { document.getElementById(champ).value = v ?? ""; };
+  set("va-type", a.type); ajusterChampsAnnonce();
+  set("va-commune", a.commune); set("va-prix", a.prix); set("va-surface", a.surface);
+  set("va-terrain", a.terrain); set("va-pieces", a.pieces); set("va-agence", a.agence || "");
+  set("va-terrain-tol", a.terrainTol ?? ""); document.getElementById("va-ajuster").checked = !!a.ajuster;
+  set("va-rayon", a.rayon || 500);
+  const radio = document.querySelector(`input[name="va-mode"][value="${a.mode === "rayon" ? "rayon" : "commune"}"]`);
+  radio.checked = true; radio.dispatchEvent(new Event("change"));
+  if (a.mode === "rayon" && a.point) placerPoint(a.point.lat, a.point.lon, "point de l'annonce suivie");
+  verifierAnnonce();
+  document.getElementById("va-resultat").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// Sauvegarde dans un fichier (téléchargé par l'utilisateur, jamais envoyé) et restauration
+function texteSauvegarde() {
+  return JSON.stringify({ format: FORMAT_SAUVEGARDE, version: 1, sauvegarde_le: aujourdhui(),
+                          annonces: lireSuivies() }, null, 1);
+}
+function messageSuivies(texte) { document.getElementById("va-suivies-msg").textContent = texte; }
+
+function sauvegarderSuivies() {
+  const n = lireSuivies().length;
+  if (!n) return;
+  const nom = `annonces-suivies_${aujourdhui()}.json`;
+  telechargerFichier(texteSauvegarde(), "application/json", nom);
+  messageSuivies(`${pluriel(n, "annonce")} dans le fichier ${nom} (dossier des téléchargements). Gardez-le hors du dossier du projet.`);
+}
+
+// Ajoute à la liste les annonces d'une sauvegarde ; celles déjà présentes (même identifiant) sont ignorées
+function restaurerDepuisTexte(texte) {
+  let donnees;
+  try { donnees = JSON.parse(texte); } catch { return { erreur: "Ce fichier n'est pas une sauvegarde valide (contenu illisible)." }; }
+  if (!donnees || donnees.format !== FORMAT_SAUVEGARDE || !Array.isArray(donnees.annonces))
+    return { erreur: "Ce fichier n'est pas une sauvegarde d'annonces suivies de cet outil." };
+  const liste = lireSuivies(), ids = new Set(liste.map(s => s.id));
+  let ajoutees = 0, deja = 0, ignorees = 0;
+  for (const brute of donnees.annonces) {
+    const s = nettoyerSuivie(brute);
+    if (!s) { ignorees++; continue; }
+    if (ids.has(s.id)) { deja++; continue; }
+    liste.push(s); ids.add(s.id); ajoutees++;
+  }
+  if (ajoutees && !ecrireSuivies(liste))
+    return { erreur: "Restauration impossible : ce navigateur bloque le stockage local (navigation privée ?)." };
+  rendreSuivies();
+  return { ajoutees, deja, ignorees };
+}
+
+async function restaurerDepuisFichier(fichier) {
+  if (!fichier) return;
+  if (fichier.size > 5e6) { messageSuivies("Fichier trop gros pour une sauvegarde d'annonces suivies."); return; }
+  const r = restaurerDepuisTexte(await fichier.text());
+  messageSuivies(r.erreur || [
+    `${pluriel(r.ajoutees, "annonce")} ${r.ajoutees > 1 ? "restaurées" : "restaurée"}`,
+    r.deja ? `${nf.format(r.deja)} déjà ${r.deja > 1 ? "présentes" : "présente"}` : "",
+    r.ignorees ? `${nf.format(r.ignorees)} ${r.ignorees > 1 ? "ignorées (incomplètes ou illisibles)" : "ignorée (incomplète ou illisible)"}` : "",
+  ].filter(Boolean).join(" ; ") + ".");
+}
+
+let confirmationEffacer = null;
+function effacerSuivies() {
+  const b = document.getElementById("va-suivies-effacer");
+  if (!confirmationEffacer) {   // premier clic : demander confirmation dans le bouton lui-même
+    const n = lireSuivies().length;
+    b.textContent = n > 1 ? `Confirmer : effacer les ${nf.format(n)} annonces ?` : "Confirmer : effacer l'annonce suivie ?";
+    confirmationEffacer = setTimeout(() => { b.textContent = "Tout effacer"; confirmationEffacer = null; }, 5000);
+    return;
+  }
+  clearTimeout(confirmationEffacer); confirmationEffacer = null;
+  b.textContent = "Tout effacer";
+  ecrireSuivies([]);
+  rendreSuivies();
+}
+
+// ---------------------------------------------------------------------------
+// Module 3 – recherche par rayon autour d'un point (carte Leaflet, fond Plan IGN)
+// ---------------------------------------------------------------------------
+const RAYON_MAX = 3000;   // m : l'élargissement s'arrête là
+const carteEtat = { carte: null, point: null, marqueur: null, cercle: null, couche: null };
+const distanceTxt = m => m >= 1000 ? `${nf.format(m / 1000)} km` : `${nf.format(m)} m`;
+
+function chercherComparablesRayon(point, surface, type, rayon, okTerrain = TOUT_TERRAIN) {
+  // Étapes : surface ±20 % puis ±30 % dans le rayon choisi, puis rayon doublé (3 km au plus)
+  const etapes = [];
+  const essais = [[rayon, 0.2], [rayon, 0.3]];
+  for (let r = rayon * 2; r <= RAYON_MAX; r *= 2) essais.push([r, 0.3]);
+  if (essais[essais.length - 1][0] < RAYON_MAX) essais.push([RAYON_MAX, 0.3]);
+  // copies avec leur distance : les ventes de VENTES ne sont jamais modifiées
+  // (plusieurs annonces suivies peuvent être analysées autour de points différents)
+  const toutes = Object.values(VENTES[type]).flat()
+    .filter(v => v.lat != null && v.date >= COMP_FENETRE.debut)
+    .map(v => ({ ...v, dist: distanceKm(point, v) * 1000 }));
+  let comp = [];
+  for (const [r, tol] of essais) {
+    comp = toutes.filter(v => v.dist <= r && Math.abs(v.surface - surface) <= tol * surface && okTerrain(v));
+    etapes.push({ rayon: r, tol, n: comp.length });
+    if (comp.length >= SEUIL) return { comp, tol, rayon: r, etapes };
+  }
+  const [r, tol] = essais[essais.length - 1];
+  return { comp, tol, rayon: r, etapes };
+}
+
+function initialiserCarte() {
+  if (carteEtat.carte || !window.L) {
+    if (!window.L) document.getElementById("va-carte").innerHTML =
+      '<p class="insuffisant" style="padding:12px">Carte indisponible (fichier app/lib/leaflet/leaflet.js introuvable).</p>';
+    return;
+  }
+  const lm = PAR_CODE[CODE_LE_MANS];
+  const carte = L.map("va-carte").setView([lm.lat, lm.lon], 13);
+  L.tileLayer("https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2" +
+    "&STYLE=normal&TILEMATRIXSET=PM&FORMAT=image/png&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}",
+    { maxZoom: 19, attribution: "Plan IGN – © IGN Géoplateforme" }).addTo(carte);
+  carte.on("click", e => placerPoint(e.latlng.lat, e.latlng.lng, "point placé sur la carte"));
+  carteEtat.carte = carte;
+}
+
+function placerPoint(lat, lon, libelle) {
+  carteEtat.point = { lat, lon };
+  const rayon = +document.getElementById("va-rayon").value;
+  if (carteEtat.carte) {
+    if (carteEtat.marqueur) carteEtat.marqueur.remove();
+    if (carteEtat.cercle) carteEtat.cercle.remove();
+    if (carteEtat.couche) { carteEtat.couche.remove(); carteEtat.couche = null; }
+    carteEtat.marqueur = L.marker([lat, lon]).addTo(carteEtat.carte);
+    carteEtat.cercle = L.circle([lat, lon], { radius: rayon, color: css("--accent"), weight: 1.5, fillOpacity: 0.06 }).addTo(carteEtat.carte);
+  }
+  document.getElementById("va-point-info").textContent = `Point : ${libelle}.`;
+}
+
+function afficherComparablesCarte(comp, rayon) {
+  if (!carteEtat.carte) return;
+  if (carteEtat.couche) carteEtat.couche.remove();
+  carteEtat.carte.invalidateSize();
+  if (carteEtat.cercle) {
+    carteEtat.cercle.setRadius(rayon);
+    carteEtat.carte.fitBounds(carteEtat.cercle.getBounds(), { padding: [20, 20] });
+  }
+  carteEtat.couche = L.layerGroup(comp.map(v => L.circleMarker([v.lat, v.lon], {
+    radius: 4, color: css("--surface"), weight: 1, fillColor: css("--series-2"), fillOpacity: 0.9,
+  }).bindTooltip(`${dateFr(v.date)} – ${euros(v.prix)} – ${nf.format(v.surface)} m² – ${euros(v.prix_m2)}/m²`))).addTo(carteEtat.carte);
+}
+
+// Niveau de précision renvoyé par le géocodage (types de la Base Adresse Nationale)
+const PRECISION_GEOCODAGE = { housenumber: "numéro", street: "rue", locality: "lieu-dit", municipality: "commune" };
+
+async function geocoder() {
+  const adresse = document.getElementById("va-adresse").value.trim();
+  const info = document.getElementById("va-point-info");
+  if (!adresse) { info.textContent = "Saisissez une adresse."; return; }
+  info.textContent = "Recherche de l'adresse…";
+  try {
+    const r = await fetch(`https://data.geopf.fr/geocodage/search?q=${encodeURIComponent(adresse)}&limit=1`);
+    const j = await r.json();
+    const f = j.features && j.features[0];
+    if (!f) { info.textContent = "Adresse introuvable."; return; }
+    const [lon, lat] = f.geometry.coordinates;
+    const libelle = `${f.properties.label} (précision : ${PRECISION_GEOCODAGE[f.properties.type] || f.properties.type})`;
+    placerPoint(lat, lon, libelle);
+    // Adresse hors de la Sarthe : aucune vente dans les données, on le dit tout de suite
+    const code = f.properties.citycode;
+    if (code && !PAR_CODE[code]) {
+      info.innerHTML = "";
+      const alerte = document.createElement("span");
+      alerte.className = "erreur";
+      alerte.textContent = "Attention, adresse hors de la Sarthe : aucune vente comparable dans les données. ";
+      info.append(alerte, `Point : ${libelle}. Vérifiez l'adresse (ajoutez la commune) ou cliquez sur la carte.`);
+    }
+    if (carteEtat.carte) carteEtat.carte.setView([lat, lon], 16);
+  } catch (err) {
+    info.textContent = "Service de géocodage injoignable : placez le point en cliquant sur la carte.";
+  }
+}
+
+document.querySelectorAll('input[name="va-mode"]').forEach(r => r.addEventListener("change", () => {
+  const rayon = document.querySelector('input[name="va-mode"]:checked').value === "rayon";
+  document.getElementById("va-carte-bloc").hidden = !rayon;
+  document.getElementById("va-rayon-champ").hidden = !rayon;
+  if (rayon) {
+    initialiserCarte();
+    // la carte a été créée dans un bloc masqué : on lui redonne sa taille puis on recentre
+    setTimeout(() => {
+      if (!carteEtat.carte) return;
+      carteEtat.carte.invalidateSize();
+      const lm = PAR_CODE[CODE_LE_MANS];
+      carteEtat.carte.setView(carteEtat.point ? [carteEtat.point.lat, carteEtat.point.lon] : [lm.lat, lm.lon], 14);
+    }, 50);
+  }
+}));
+// Version en ligne (window.SANS_CARTE) : fond de carte et géocodage indisponibles, on masque l'option rayon
+if (window.SANS_CARTE) {
+  document.getElementById("va-mode-rayon").hidden = true;
+  document.getElementById("va-sans-carte").hidden = false;
+}
+document.getElementById("va-rayon").addEventListener("change", e => { if (carteEtat.cercle) carteEtat.cercle.setRadius(+e.target.value); });
+document.getElementById("va-geocoder").addEventListener("click", geocoder);
+document.getElementById("va-adresse").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); geocoder(); } });
+
+// Le terrain n'a de sens que pour une maison
+function ajusterChampsAnnonce() {
+  const type = document.getElementById("va-type").value;
+  document.getElementById("va-terrain-champ").hidden = type !== "maison";
+  document.getElementById("va-terrain-tol-champ").hidden = type !== "maison";
+  document.getElementById("va-surface").min = SURFACE_MIN[type];
+}
+// Changer le filtre sur le terrain ou l'ajustement des prix relance la vérification si un résultat est affiché
+for (const id of ["va-terrain-tol", "va-ajuster"])
+  document.getElementById(id).addEventListener("change", () => {
+    if (document.getElementById("va-resultat").innerHTML) verifierAnnonce();
+  });
+document.getElementById("va-ajuster-libelle").textContent =
+  `Ramener les prix des ventes à ${DERNIERE} (évolution de la médiane)`;
+
+// Boutons du résultat (suivre, copier, télécharger) et des annonces suivies
+document.getElementById("va-resultat").addEventListener("click", e => {
+  const id = e.target.closest("button")?.id;
+  if (id === "va-suivre") suivreAnnonce();
+  else if (id === "va-copier") copierComparables();
+  else if (id === "va-csv") telechargerComparables();
+});
+document.getElementById("va-resultat").addEventListener("keydown", e => {
+  if (e.key === "Enter" && e.target.id === "va-suivre-nom") { e.preventDefault(); suivreAnnonce(); }
+});
+document.getElementById("va-suivies").addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.afficher) afficherSuivie(b.dataset.afficher);
+  if (b.dataset.supprimer) { ecrireSuivies(lireSuivies().filter(s => s.id !== b.dataset.supprimer)); rendreSuivies(); }
+});
+document.getElementById("va-suivies-effacer").addEventListener("click", effacerSuivies);
+document.getElementById("va-suivies-sauver").addEventListener("click", sauvegarderSuivies);
+document.getElementById("va-suivies-restaurer").addEventListener("click", () => document.getElementById("va-suivies-fichier").click());
+document.getElementById("va-suivies-fichier").addEventListener("change", async e => {
+  await restaurerDepuisFichier(e.target.files[0]);
+  e.target.value = "";   // permet de choisir à nouveau le même fichier
+});
+document.getElementById("va-type").addEventListener("change", ajusterChampsAnnonce);
+ajusterChampsAnnonce();
+document.getElementById("form-annonce").addEventListener("submit", e => { verifierAnnonce(e); focaliserResultat("va-resultat"); });
+
+// ---------------------------------------------------------------------------
+// Module 2 – Budget → où acheter
+// ---------------------------------------------------------------------------
+// Prix de référence au m² : années complètes (comme le contrôle de 03_statistiques.py)
+const B_ANNEES = [DERNIERE - 1, DERNIERE];   // « 2 dernières années » complètes
+// Ventes « dans le budget » : 24 derniers mois publiés
+const B_FENETRE = fenetreMois(24);
+
+// Prix médian au m² de référence : dernière année complète, ou 2 dernières années cumulées sous 5 ventes
+function prixReference(code, type) {
+  const s = statsAnnee(code, DERNIERE, type);
+  if (s.prix_m2_median != null) return { med: s.prix_m2_median, n: s.n, periode: `${DERNIERE}` };
+  const liste = (VENTES[type][code] || []).filter(v => v.annee >= B_ANNEES[0] && v.annee <= B_ANNEES[1]);
+  if (liste.length >= SEUIL) {
+    return { med: Math.round(quantile(liste.map(v => v.prix_m2), .5)), n: liste.length, periode: `${B_ANNEES[0]}-${B_ANNEES[1]}` };
+  }
+  return { med: null, n: liste.length, periode: `${B_ANNEES[0]}-${B_ANNEES[1]}` };
+}
+
+function calculerBudget(e) {
+  if (e) e.preventDefault();
+  const sortie = document.getElementById("b-resultat");
+  const val = id => { const x = document.getElementById(id).value; return x === "" ? null : +x; };
+  const type = document.getElementById("b-type").value;
+  const budget = val("b-budget");
+  const notaire = document.getElementById("b-notaire").checked;
+  const taux = val("b-taux") ?? 7.5;
+  // 0 ou vide = pas de critère
+  const surfaceMin = val("b-surface") > 0 ? val("b-surface") : null;
+  const terrainMin = type === "maison" && val("b-terrain") > 0 ? val("b-terrain") : null;
+  if (!budget || budget <= 0) { sortie.innerHTML = '<div class="carte"><p class="erreur">Indiquez un budget.</p></div>'; return; }
+
+  // Frais de notaire calculés sur le prix : budget = prix × (1 + taux) => prix = budget ÷ (1 + taux)
+  const prixAchat = notaire ? budget / (1 + taux / 100) : budget;
+  const codes = COMMUNES.filter(c => document.getElementById("b-perimetre").value === "sarthe" || c.zone !== "sarthe").map(c => c.code);
+  const criteres = surfaceMin != null || terrainMin != null;
+
+  const lignes = codes.map(code => {
+    const ref = prixReference(code, type);
+    const ventes2 = (VENTES[type][code] || []).filter(v => v.date >= B_FENETRE.debut);
+    // terrain inconnu dans DVF : la vente ne peut pas être retenue (comptée à part, signalée)
+    const okCriteres = v => (surfaceMin == null || v.surface >= surfaceMin) && (terrainMin == null || (v.terrain != null && v.terrain >= terrainMin));
+    const nCriteres = ventes2.filter(okCriteres).length;
+    const sansTerrain = terrainMin == null ? 0 : ventes2.filter(v => v.terrain == null).length;
+    const k = ventes2.filter(v => v.prix <= prixAchat && okCriteres(v)).length;
+    const n = ventes2.length;
+    return {
+      code, c: PAR_CODE[code], ref, n, k, nCriteres, sansTerrain,
+      part: n >= SEUIL ? k / n : null,
+      surface: ref.med ? prixAchat / ref.med : null,
+      prixPourSurface: ref.med && surfaceMin ? ref.med * surfaceMin : null,
+    };
+  });
+  // Classement : part des ventes dans le budget (et les critères), puis surface atteignable
+  lignes.sort((a, b) => (b.part ?? -1) - (a.part ?? -1) || (b.surface ?? -1) - (a.surface ?? -1) || a.c.nom.localeCompare(b.c.nom, "fr"));
+  // En Sarthe entière, on n'affiche pas les communes sans aucune vente du type sur 2 ans
+  const affichees = lignes.filter(l => l.n > 0 || l.c.zone !== "sarthe");
+  const masquees = lignes.length - affichees.length;
+  const totalSansTerrain = affichees.reduce((s, l) => s + l.sansTerrain, 0);
+  const totalVentes = affichees.reduce((s, l) => s + l.n, 0);
+
+  const crit = [surfaceMin != null ? `au moins ${nf.format(surfaceMin)} m² habitables` : null,
+                terrainMin != null ? `au moins ${nf.format(terrainMin)} m² de terrain` : null].filter(Boolean).join(" et ");
+  let rang = 0;
+  sortie.innerHTML = `
+    <div class="carte">
+      <h2>Prix d'achat possible : ${euros(Math.round(prixAchat / 100) * 100)}</h2>
+      <p class="aide">${notaire
+        ? `Budget de ${euros(budget)} moins les frais de notaire (${String(taux).replace(".", ",")} % du prix dans l'ancien) : prix = budget ÷ ${String(1 + taux / 100).replace(".", ",")}.`
+        : `Budget de ${euros(budget)}, frais de notaire non inclus : prévoir environ ${String(taux).replace(".", ",")} % en plus (${euros(Math.round(budget * taux / 100 / 100) * 100)}).`}
+        Les prix DVF n'incluent pas les frais d'agence payés par l'acheteur : si l'agence est à votre charge, réduisez le budget d'autant.</p>
+      <p class="aide">Classement : communes où la plus grande part des ventes de ${LIBELLE_TYPE[type].des} ${B_FENETRE.texte}
+        est entrée dans ce prix${crit ? ` en ayant ${crit}` : ""}. Surface atteignable = prix d'achat ÷ prix médian au m²
+        (année ${DERNIERE}, ou ${B_ANNEES[0]}-${B_ANNEES[1]} cumulées s'il y a moins de ${SEUIL} ventes en ${DERNIERE}).
+        ${masquees ? `${nf.format(masquees)} communes sans aucune vente de ce type ${B_FENETRE.texte} ne sont pas affichées.` : ""}
+        ${totalSansTerrain ? `Terrain minimum : ${pluriel(totalSansTerrain, "vente")} sur ${nf.format(totalVentes)} ${totalSansTerrain > 1 ? "n'ont" : "n'a"} pas de terrain renseigné dans DVF ; ${totalSansTerrain > 1 ? "elles ne peuvent" : "elle ne peut"} pas être retenue${totalSansTerrain > 1 ? "s" : ""} (colonne « sans terrain connu »).` : ""}</p>
+      <div class="table-wrap"><table>
+        <thead><tr>
+          <th>Commune</th>
+          <th>Ventes ${B_FENETRE.court}<br>dans le budget${crit ? " et les critères" : ""}</th>
+          <th>Surface atteignable<br>(au prix médian)</th>
+          <th>Prix médian au m²</th>
+          ${surfaceMin ? `<th>Prix médian pour<br>${nf.format(surfaceMin)} m²</th>` : ""}
+          ${crit ? `<th>Ventes correspondant<br>aux critères (tout prix)</th>` : ""}
+          ${terrainMin != null ? `<th>Ventes sans<br>terrain connu</th>` : ""}
+        </tr></thead>
+        <tbody>${affichees.map(l => {
+          const ok = l.part != null;
+          if (ok) rang++;
+          return `<tr class="${l.c.zone !== "sarthe" ? "coeur-mans" : ""}">
+            <td>${ok ? `<span class="rang">${rang}.</span>` : ""}${l.c.nom} <span class="zone">${LIBELLE_ZONE[l.c.zone]}</span></td>
+            <td>${ok
+              ? `<span class="jauge" aria-hidden="true"><i style="width:${(l.part * 100).toFixed(1)}%"></i></span>${Math.round(l.part * 100)} %<span class="n bloc">${nf.format(l.k)} sur ${pluriel(l.n, "vente")}</span>`
+              : `${INSUFFISANT}<span class="n bloc">${nf.format(l.k)} sur ${pluriel(l.n, "vente")}</span>`}</td>
+            <td>${l.surface ? `${nf.format(Math.round(l.surface))} m²` : INSUFFISANT}</td>
+            <td>${l.ref.med ? `${euros(l.ref.med)}<span class="n bloc">${l.ref.periode}, ${pluriel(l.ref.n, "vente")}</span>` : `<span class="n">${pluriel(l.ref.n, "vente")}</span>`}</td>
+            ${surfaceMin ? `<td>${l.prixPourSurface ? euros(Math.round(l.prixPourSurface / 1000) * 1000) : ""}</td>` : ""}
+            ${crit ? `<td>${nf.format(l.nCriteres)}</td>` : ""}
+            ${terrainMin != null ? `<td>${l.sansTerrain ? nf.format(l.sansTerrain) : "–"}</td>` : ""}
+          </tr>`;
+        }).join("")}</tbody>
+      </table></div>
+      <p class="aide" style="margin-top:12px">Rappel : ces chiffres disent ce qui s'est vendu, pas dans quel état. Une part élevée peut venir de biens à rénover.</p>
+    </div>`;
+}
+
+document.getElementById("form-budget").addEventListener("submit", e => { calculerBudget(e); focaliserResultat("b-resultat"); });
+
+// ---------------------------------------------------------------------------
+// Module 4 – Rendement locatif
+// ---------------------------------------------------------------------------
+const fmt1 = x => x.toFixed(1).replace(".", ",");
+const fmt2 = x => x.toFixed(2).replace(".", ",");
+const AVERT = '<span aria-hidden="true">⚠</span>';
+
+function texteFiabilite(loy) {
+  return loy.fiable
+    ? `fiable (${nf.format(loy.nb_annonces_commune)} annonces dans la commune)`
+    : `peu fiable : ${loy.raisons.join(", ")} (${nf.format(loy.nb_annonces_commune ?? 0)} annonces dans la commune, ${nf.format(loy.nb_annonces_zone ?? 0)} dans la zone)`;
+}
+
+function calculerRendement(e) {
+  if (e) e.preventDefault();
+  const sortie = document.getElementById("r-resultat");
+  const val = id => { const x = document.getElementById(id).value; return x === "" ? null : +x; };
+  const type = document.getElementById("r-type").value;
+  const c = trouverCommune(document.getElementById("r-commune").value);
+  const prix = val("r-prix"), surface = val("r-surface"), loyerVise = val("r-loyer");
+  const taux = document.getElementById("r-notaire").checked ? (val("r-taux") ?? 7.5) : 0;
+  if (!c) { sortie.innerHTML = '<div class="carte"><p class="erreur">Commune non trouvée : choisissez-la dans la liste proposée.</p></div>'; return; }
+  if (!prix || !surface) { sortie.innerHTML = '<div class="carte"><p class="erreur">Indiquez le prix d\'achat et la surface.</p></div>'; return; }
+  const loy = D.loyers[type][c.code];
+  if (!loy) { sortie.innerHTML = `<div class="carte"><p class="erreur">Pas d'indicateur de loyer pour ${c.nom}.</p></div>`; return; }
+
+  const cout = prix * (1 + taux / 100);
+  const loyerEstime = loy.loyer_m2 * surface;
+  const loyer = loyerVise ?? loyerEstime;
+  const rend = l => l * 12 / cout * 100;
+  const bienType = D.meta.loyers.bien_type[type];
+  const surfType = D.meta.loyers.surface_type[type];
+  const avertissements = [];
+  if (!loy.fiable) avertissements.push(`${AVERT} <strong>Indicateur de loyer peu fiable</strong> pour ${c.nom} : ${loy.raisons.join(", ")}.`);
+  if (surface < surfType * 0.6 || surface > surfType * 1.6)
+    avertissements.push(`${AVERT} Le loyer au m² est calculé pour un ${bienType}. Pour ${nf.format(surface)} m², le loyer réel au m² est en général ${surface > surfType ? "plus bas (grande surface)" : "plus haut (petite surface)"} : l'estimation est à prendre avec prudence.`);
+
+  sortie.innerHTML = `
+    <div class="carte">
+      <h2>Rendement brut</h2>
+      <div class="verdict">
+        <div><div class="libelle">Loyer ${loyerVise != null ? "visé" : "estimé"}</div><div class="chiffre">${euros(Math.round(loyer))}<span style="font-size:15px;font-weight:400"> /mois</span></div>
+             <div class="n">${loyerVise != null ? `estimation : ${euros(Math.round(loyerEstime))}` : `${fmt2(loy.loyer_m2)} €/m² × ${nf.format(surface)} m²`}</div></div>
+        <div><div class="libelle">Coût d'achat</div><div class="chiffre">${euros(Math.round(cout))}</div>
+             <div class="n">${taux ? `prix + ${String(taux).replace(".", ",")} % de frais de notaire` : "prix seul"}</div></div>
+        <div><div class="libelle">Rendement brut</div><div class="chiffre">${fmt1(rend(loyer))} %</div>
+             <div class="n">loyer annuel ÷ coût d'achat</div></div>
+        ${loyerVise != null ? `<div><div class="libelle">Avec le loyer estimé</div><div class="chiffre">${fmt1(rend(loyerEstime))} %</div><div class="n">${euros(Math.round(loyerEstime))} /mois</div></div>` : ""}
+      </div>
+      <p style="margin-top:14px">Fourchette du loyer estimé (intervalle à 95 % de la carte des loyers) : ${euros(Math.round(loy.ip_bas * surface))} à ${euros(Math.round(loy.ip_haut * surface))} par mois,
+        soit un rendement brut de ${fmt1(rend(loy.ip_bas * surface))} % à ${fmt1(rend(loy.ip_haut * surface))} %.</p>
+      ${avertissements.map(a => `<p class="note-elargi">${a}</p>`).join("")}
+      <p class="aide" style="margin-top:12px">Loyer d'annonce charges comprises (${D.meta.loyers.periode}, ${bienType}), indicateur ${texteFiabilite(loy)}.
+        Ce n'est pas un loyer signé. Rendement <strong>brut</strong> : avant charges non récupérables, taxe foncière, vacance, travaux, gestion et impôts.
+        Source : ${D.meta.loyers.mention}.</p>
+    </div>`;
+}
+
+function rendreClassementRendement() {
+  const type = document.getElementById("r-type").value;
+  const sarthe = document.getElementById("r-perimetre").value === "sarthe";
+  const lignes = COMMUNES.filter(c => sarthe || c.zone !== "sarthe").map(c => {
+    const ref = prixReference(c.code, type);
+    const loy = D.loyers[type][c.code];
+    return { c, ref, loy, rend: ref.med && loy ? loy.loyer_m2 * 12 / ref.med * 100 : null };
+  }).filter(l => !sarthe || l.ref.n > 0 || l.c.zone !== "sarthe");
+  lignes.sort((a, b) => (b.rend ?? -1) - (a.rend ?? -1) || a.c.nom.localeCompare(b.c.nom, "fr"));
+
+  document.getElementById("r-titre-classement").textContent = `Rendement brut théorique par commune – ${LIBELLE_TYPE[type].des}`;
+  document.getElementById("r-aide-classement").textContent =
+    `Rendement brut théorique = loyer d'annonce au m² × 12 ÷ prix médian au m² (année ${DERNIERE}, ou ${B_ANNEES[0]}-${B_ANNEES[1]} cumulées sous ${SEUIL} ventes). ` +
+    `C'est un ordre de grandeur pour comparer les communes, pas le rendement d'un bien précis.`;
+  document.querySelector("#r-classement thead").innerHTML =
+    "<tr><th>Commune</th><th>Rendement brut<br>théorique</th><th>Loyer d'annonce<br>(€/m²/mois)</th><th class=\"gauche\">Fiabilité du loyer</th><th>Prix médian au m²</th></tr>";
+  let rang = 0;
+  document.querySelector("#r-classement tbody").innerHTML = lignes.map(l => {
+    const ok = l.rend != null;
+    if (ok) rang++;
+    return `<tr class="${l.c.zone !== "sarthe" ? "coeur-mans" : ""}">
+      <td>${ok ? `<span class="rang">${rang}.</span>` : ""}${l.c.nom} <span class="zone">${LIBELLE_ZONE[l.c.zone]}</span></td>
+      <td>${ok ? `${fmt1(l.rend)} %` : INSUFFISANT}</td>
+      <td>${l.loy ? fmt2(l.loy.loyer_m2) + " €" : "–"}</td>
+      <td class="gauche" style="white-space:normal;min-width:220px">${l.loy ? (l.loy.fiable ? `fiable <span class="n">(${nf.format(l.loy.nb_annonces_commune)} annonces)</span>` : `${AVERT} peu fiable <span class="n">(${l.loy.raisons.join(", ")})</span>`) : ""}</td>
+      <td>${l.ref.med ? `${euros(l.ref.med)}<span class="n bloc">${l.ref.periode}, ${pluriel(l.ref.n, "vente")}</span>` : `<span class="n">${pluriel(l.ref.n, "vente")}</span>`}</td>
+    </tr>`;
+  }).join("");
+}
+
+document.getElementById("form-rendement").addEventListener("submit", e => { calculerRendement(e); focaliserResultat("r-resultat"); });
+document.getElementById("r-type").addEventListener("change", rendreClassementRendement);
+document.getElementById("r-perimetre").addEventListener("change", rendreClassementRendement);
+rendreClassementRendement();
+document.getElementById("b-type").addEventListener("change", e => {
+  document.getElementById("b-terrain-champ").hidden = e.target.value !== "maison";
+});
+for (const id of ["va-seuil-bas", "va-seuil-haut"])
+  document.getElementById(id).addEventListener("change", () => {
+    if (document.getElementById("va-resultat").innerHTML) verifierAnnonce();
+    rendreSuivies();   // les verdicts des annonces suivies dépendent aussi des seuils
+  });
+rendreSuivies();
+
+// Rappel de mise à jour : DVF publie vers fin avril et fin octobre. Si l'une de ces échéances
+// est passée depuis le dernier téléchargement des fichiers DVF, la page le signale.
+function texteRappelMiseAJour(jour = aujourdhui()) {
+  const telecharge = (D.meta.sources.find(s => s.source.startsWith("DVF")) || {}).telecharge_le || D.meta.genere_le.slice(0, 10);
+  const a = +jour.slice(0, 4);
+  const echeances = [`${a - 1}-04-30`, `${a - 1}-10-31`, `${a}-04-30`, `${a}-10-31`].filter(d => d <= jour);
+  const derniere = echeances[echeances.length - 1];
+  if (!derniere || telecharge >= derniere) return "";
+  return `Mise à jour conseillée : les fichiers DVF ont été téléchargés le ${dateFr(telecharge)} et une nouvelle publication ` +
+    `(${derniere.slice(5, 7) === "04" ? "avril" : "octobre"} ${derniere.slice(0, 4)}) est probablement disponible. ` +
+    `Lancer scripts/00_tout_regenerer.py, puis recharger la page.`;
+}
+{
+  const rappel = texteRappelMiseAJour(), zone = document.getElementById("rappel-maj");
+  zone.textContent = rappel;
+  zone.hidden = !rappel;
+  zone.style.display = rappel ? "block" : "";
+}
+
+construireFiltres();
+construireGroupes();
+rendreMeta();
+rendre();
+// ---------------------------------------------------------------------------
+// Carte des prix : prix médian au m² de référence par commune (même règle que les onglets
+// Budget et Rendement : dernière année complète, ou 2 années cumulées sous 5 ventes).
+// 6 classes de même effectif (quantiles), échelle séquentielle bleue ; gris = données insuffisantes.
+// ---------------------------------------------------------------------------
+const NB_CLASSES_CARTE = 6;
+const carteprix = { carte: null, couches: new Map(), fond: null };
+
+function classesCarte(type) {
+  const parCode = {};
+  for (const c of COMMUNES) parCode[c.code] = { ...prixReference(c.code, type), classe: null };
+  const valeurs = Object.values(parCode).map(r => r.med).filter(m => m != null);
+  // seuils entre classes, arrondis à 10 € (affichés dans la légende)
+  const seuils = [];
+  for (let k = 1; k < NB_CLASSES_CARTE; k++) seuils.push(Math.round(quantile(valeurs, k / NB_CLASSES_CARTE) / 10) * 10);
+  for (const r of Object.values(parCode)) if (r.med != null) r.classe = seuils.filter(s => r.med >= s).length;
+  return { parCode, seuils, nbAvecPrix: valeurs.length };
+}
+
+const couleurClasse = classe => classe == null ? css("--carte-vide") : css(`--seq-${classe + 1}`);
+
+function styleCommune(r) {
+  return { color: css("--surface"), weight: 0.8, fillColor: couleurClasse(r.classe), fillOpacity: r.classe == null ? 0.55 : 0.85 };
+}
+
+function rendreLegendeCarte(res) {
+  const s = res.seuils, e = x => nf.format(x) + " €";
+  const libelles = [`moins de ${e(s[0])}`, ...s.slice(0, -1).map((v, k) => `${e(v)} à ${e(s[k + 1])}`), `${e(s[s.length - 1])} et plus`];
+  document.getElementById("c-legende").innerHTML =
+    libelles.map((l, k) => `<span><i style="background:${couleurClasse(k)}"></i>${l}</span>`).join("") +
+    `<span><i style="background:${couleurClasse(null)}"></i>données insuffisantes</span>`;
+}
+
+function rendreTableauCarte(res, type) {
+  const lignes = COMMUNES.map(c => ({ c, r: res.parCode[c.code] }))
+    .sort((a, b) => (a.r.med ?? Infinity) - (b.r.med ?? Infinity) || a.c.nom.localeCompare(b.c.nom, "fr"));
+  document.querySelector("#c-tableau thead").innerHTML =
+    "<tr><th>Commune</th><th>Prix médian au m²</th><th>Ventes</th><th>Période</th><th>Classe</th></tr>";
+  document.querySelector("#c-tableau tbody").innerHTML = lignes.map(({ c, r }) => `<tr>
+    <td>${c.nom} <span class="zone">${LIBELLE_ZONE[c.zone]}</span></td>
+    <td>${r.med != null ? euros(r.med) : INSUFFISANT}</td><td>${nf.format(r.n)}</td><td>${r.periode}</td>
+    <td>${r.classe != null ? `${r.classe + 1} / ${NB_CLASSES_CARTE}` : "–"}</td></tr>`).join("");
+}
+
+function texteInfoCommune(c, r, type) {
+  return r.med != null
+    ? `${c.nom} : ${euros(r.med)}/m² (${LIBELLE_TYPE[type].des}, ${pluriel(r.n, "vente")}, ${r.periode})`
+    : `${c.nom} : données insuffisantes (${pluriel(r.n, "vente")} de ${LIBELLE_TYPE[type].des}, ${r.periode})`;
+}
+
+function rendreCartePrix() {
+  const type = document.getElementById("c-type").value;
+  const res = classesCarte(type);
+  document.getElementById("c-titre").textContent = `Prix médian au m² par commune – ${LIBELLE_TYPE[type].des}`;
+  document.getElementById("c-aide").textContent =
+    `Prix médian au m² de l'année ${DERNIERE} (ou ${B_ANNEES[0]}-${B_ANNEES[1]} cumulées s'il y a moins de ${SEUIL} ventes en ${DERNIERE}), ` +
+    `comme dans les onglets Budget et Rendement. ${nf.format(res.nbAvecPrix)} communes sur ${nf.format(COMMUNES.length)} ont assez de ventes ; ` +
+    `les couleurs les répartissent en ${NB_CLASSES_CARTE} groupes de même taille, du moins cher au plus cher (voir la légende).`;
+  rendreLegendeCarte(res);
+  rendreTableauCarte(res, type);
+  if (!carteprix.carte) return;
+  for (const [code, couche] of carteprix.couches) {
+    const c = PAR_CODE[code], r = res.parCode[code];
+    couche.setStyle(styleCommune(r));
+    couche.setTooltipContent(texteInfoCommune(c, r, type));
+  }
+}
+
+function afficherCartePrix() {
+  if (!carteprix.carte && window.L) {
+    const carte = L.map("c-carte", { zoomSnap: 0.25, zoomDelta: 0.5 });
+    carteprix.fond = L.tileLayer("https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2" +
+      "&STYLE=normal&TILEMATRIXSET=PM&FORMAT=image/png&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}",
+      { maxZoom: 19, opacity: 0.5, attribution: "Plan IGN – © IGN Géoplateforme ; contours : API Géo" }).addTo(carte);
+    const info = document.getElementById("c-info");
+    for (const c of COMMUNES) {
+      const contour = (D.contours || {})[c.code];
+      if (!contour) continue;
+      // [lon, lat] (GeoJSON) -> [lat, lon] (Leaflet)
+      const couche = L.polygon(contour.map(p => p.map(a => a.map(([x, y]) => [y, x]))), { weight: 0.8 })
+        .bindTooltip("", { sticky: true })
+        .on("mouseover", e => { e.target.setStyle({ weight: 2.5, color: css("--text") }); e.target.bringToFront(); info.textContent = e.target.getTooltip().getContent(); })
+        .on("mouseout", e => { e.target.setStyle({ weight: 0.8, color: css("--surface") }); })
+        .addTo(carte);
+      carteprix.couches.set(c.code, couche);
+    }
+    carteprix.carte = carte;
+    carteprix.aCentrer = true;   // centrage fait une fois la section affichée (taille connue)
+  } else if (!window.L) {
+    document.getElementById("c-carte").innerHTML =
+      '<p class="insuffisant" style="padding:12px">Carte indisponible (fichier app/lib/leaflet/leaflet.js introuvable). Les données restent lisibles dans le tableau ci-dessous.</p>';
+  }
+  rendreCartePrix();
+  if (carteprix.carte) setTimeout(() => {   // la section vient d'apparaître : recalculer sa taille
+    carteprix.carte.invalidateSize();
+    if (carteprix.aCentrer) { vueCarte("sarthe"); carteprix.aCentrer = false; }
+  }, 0);
+}
+
+function vueCarte(vue) {
+  if (!carteprix.carte) return;
+  const couches = [...carteprix.couches].filter(([code]) => vue === "sarthe" || PAR_CODE[code].zone !== "sarthe").map(([, c]) => c);
+  if (couches.length) carteprix.carte.fitBounds(L.featureGroup(couches).getBounds(), { padding: [10, 10] });
+}
+
+document.getElementById("c-type").addEventListener("change", rendreCartePrix);
+document.getElementById("c-vue-mans").addEventListener("click", () => vueCarte("mans"));
+document.getElementById("c-vue-sarthe").addEventListener("click", () => vueCarte("sarthe"));
+
+// Le graphique et les cartes relisent leurs couleurs si le thème du système change
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  if (carteprix.carte) rendreCartePrix();
+  rendre();
+  if (carteEtat.cercle) carteEtat.cercle.setStyle({ color: css("--accent") });
+  if (carteEtat.couche) carteEtat.couche.eachLayer(p => p.setStyle({ color: css("--surface"), fillColor: css("--series-2") }));
+});
+// Passage écran large / téléphone (rotation, fenêtre redimensionnée) : le graphique se réajuste
+ECRAN_ETROIT.addEventListener("change", () => rendreGraphique());
+
+// Onglet demandé dans l'adresse (ex. index.html#carte) : en tout dernier, une fois tout le code
+// de la page lu (sinon la carte des prix, définie plus haut, ne serait pas encore prête)
+if (ONGLETS.includes(location.hash.slice(1))) afficherOnglet(location.hash.slice(1));
+</script>
+</body>
+</html>
