@@ -265,7 +265,7 @@
 
     <div class="carte">
       <h2>Prix médian au m² par année</h2>
-      <p class="aide">Cliquez sur la pastille d'une commune dans le tableau pour la mettre en couleur (8 au maximum). Les autres communes cochées restent en gris. Une année avec moins de 5 ventes n'a pas de point.</p>
+      <p class="aide">Cliquez sur la pastille d'une commune dans le tableau pour la mettre en couleur (8 au maximum). Les autres communes cochées restent en gris. Une année avec moins de 5 ventes n'a pas de point.<span id="note-graphique-partielle"></span></p>
       <div class="legende" id="legende"></div>
       <div class="graphique"><canvas id="graphique" aria-label="Prix médian au m² par année et par commune" role="img"></canvas></div>
       <details>
@@ -521,6 +521,13 @@ function fenetreMois(nbMois) {
   return { debut, texte: `de ${moisAnnee(debut)} à ${moisAnnee(FIN_DONNEES)}`,
            court: `${moisAnnee(debut)} – ${moisAnnee(FIN_DONNEES)}` };
 }
+// Année en cours de publication (ex. 2026 quand DVF ne publie que janvier à juin) : affichée
+// comme les autres, mais toujours signalée comme incomplète
+const ANNEE_PARTIELLE = D.meta.periode.annees.find(a => a > D.meta.periode.derniere_annee_complete) ?? null;
+const MOIS_PARTIELLE = ANNEE_PARTIELLE === null ? "" :
+  (+FIN_DONNEES.slice(0, 4) === ANNEE_PARTIELLE ? `janvier à ${NOMS_MOIS[+FIN_DONNEES.slice(5, 7) - 1]}` : "début d'année");
+// « 2026 (janvier à juin) » pour l'année incomplète, l'année seule sinon
+const anneeTxt = a => +a === ANNEE_PARTIELLE ? `${a} (${MOIS_PARTIELLE})` : `${a}`;
 const COMMUNES = D.communes;
 const PAR_CODE = Object.fromEntries(COMMUNES.map(c => [c.code, c]));
 const CODE_LE_MANS = "72181";
@@ -616,8 +623,17 @@ function couleurSlot(slot) {
 function css(nom) { return getComputedStyle(document.documentElement).getPropertyValue(nom).trim(); }
 
 function periodeTexte() {
-  if (etat.cumul) return etat.debut === etat.fin ? `${etat.fin}` : `${etat.debut} à ${etat.fin} cumulées`;
-  return `${etat.fin}`;
+  if (etat.cumul) return etat.debut === etat.fin ? anneeTxt(etat.fin) : `${etat.debut} à ${anneeTxt(etat.fin)} cumulées`;
+  return anneeTxt(etat.fin);
+}
+// Phrase d'avertissement si l'année incomplète fait partie de la période affichée
+function noteAnneePartielle() {
+  const touchee = ANNEE_PARTIELLE !== null &&
+    (etat.fin === ANNEE_PARTIELLE || etat.debut === ANNEE_PARTIELLE);
+  return touchee
+    ? ` Attention : ${ANNEE_PARTIELLE} est incomplète (ventes de ${MOIS_PARTIELLE} ${ANNEE_PARTIELLE} seulement, les suivantes ne sont pas encore publiées) : ` +
+      `moins de ventes, et une médiane qui peut refléter un effet de saison.`
+    : "";
 }
 
 // ---------------------------------------------------------------------------
@@ -627,8 +643,9 @@ function construireFiltres() {
   const selDebut = document.getElementById("annee-debut");
   const selFin = document.getElementById("annee-fin");
   for (const a of ANNEES) {
-    selDebut.add(new Option(a, a, false, a === etat.debut));
-    selFin.add(new Option(a, a, false, a === etat.fin));
+    const lib = a === ANNEE_PARTIELLE ? `${a} (incomplète : ${MOIS_PARTIELLE})` : `${a}`;
+    selDebut.add(new Option(lib, a, false, a === etat.debut));
+    selFin.add(new Option(lib, a, false, a === etat.fin));
   }
   selDebut.onchange = () => { etat.debut = +selDebut.value; if (etat.debut > etat.fin) { etat.fin = etat.debut; selFin.value = etat.fin; } rendre(); };
   selFin.onchange = () => { etat.fin = +selFin.value; if (etat.fin < etat.debut) { etat.debut = etat.fin; selDebut.value = etat.debut; } rendre(); };
@@ -792,6 +809,8 @@ function rendreTableau() {
 
   const des = LIBELLE_TYPE[etat.type].des;
   const nInsuffisant = lignes.filter(l => l.s.prix_m2_median == null).length;
+  // le texte d'aide est réécrit : un message temporaire en cours (alerteDouce) ne doit plus le remplacer
+  if (alerteEnCours) { clearTimeout(alerteEnCours.minuterie); alerteEnCours = null; }
   document.getElementById("titre-tableau").textContent =
     `Communes triées par prix médian au m² – ${des} vendus en ${periodeTexte()}`.replace("maisons vendus", "maisons vendues");
   document.getElementById("aide-tableau").textContent =
@@ -800,7 +819,8 @@ function rendreTableau() {
     (avecTerrain ? "Le terrain médian porte sur les ventes où un terrain est renseigné. " : "") +
     (nInsuffisant ? `${nf.format(nInsuffisant)} commune${nInsuffisant > 1 ? "s" : ""} sur ${nf.format(lignes.length)} ${nInsuffisant > 1 ? "ont" : "a"} moins de ${SEUIL} ventes sur cette période` +
       (etat.cumul ? ". " : " : cocher « Médianes sur toutes les ventes de la période » peut aider. ") : "") +
-    `L'évolution compare les médianes de ${etat.debut} et ${etat.fin}, chacune sur ses propres ventes.`;
+    `L'évolution compare les médianes de ${etat.debut} et ${etat.fin}, chacune sur ses propres ventes.` +
+    noteAnneePartielle();
 }
 
 // ---------------------------------------------------------------------------
@@ -879,7 +899,8 @@ function rendreGraphique() {
       layout: { padding: { right: ECRAN_ETROIT.matches ? 8 : 140, top: 8 } },
       interaction: { mode: "index", intersect: false },
       scales: {
-        x: { grid: { display: false }, border: { color: css("--axis") }, ticks: { color: texte } },
+        x: { grid: { display: false }, border: { color: css("--axis") },
+             ticks: { color: texte, callback(v) { const a = this.getLabelForValue(v); return +a === ANNEE_PARTIELLE ? `${a} (incomplète)` : a; } } },
         y: {
           grid: { color: grille }, border: { display: false },
           ticks: { color: texte, callback: v => nf.format(v) + " €" },
@@ -892,7 +913,7 @@ function rendreGraphique() {
           filter: item => item.dataset.enAvant,
           itemSort: (a, b) => (b.raw ?? -1) - (a.raw ?? -1),
           callbacks: {
-            title: items => items.length ? `Année ${items[0].label}` : "",
+            title: items => items.length ? `Année ${anneeTxt(items[0].label)}` : "",
             label: item => {
               const s = statsAnnee(item.dataset.code, item.label);
               return item.raw === null
@@ -914,7 +935,7 @@ function rendreGraphique() {
   // Vue tableau du graphique : toutes les communes cochées, toutes les années
   const codes = [...etat.selection].sort((a, b) => PAR_CODE[a].nom.localeCompare(PAR_CODE[b].nom, "fr"));
   document.querySelector("#tableau-annees thead").innerHTML =
-    "<tr><th>Commune</th>" + ANNEES.map(a => `<th>${a}</th>`).join("") + "</tr>";
+    "<tr><th>Commune</th>" + ANNEES.map(a => `<th>${a === ANNEE_PARTIELLE ? `${a}<br>(${MOIS_PARTIELLE})` : a}</th>`).join("") + "</tr>";
   document.querySelector("#tableau-annees tbody").innerHTML = codes.map(code =>
     `<tr><td>${PAR_CODE[code].nom}</td>` + ANNEES.map(a => {
       const s = statsAnnee(code, a);
@@ -989,6 +1010,8 @@ function rendreMeta() {
 }
 
 function rendre() {
+  // une commune décochée libère sa couleur (sinon elle occuperait une des 8 couleurs sans être visible)
+  for (const code of [...etat.slots.keys()]) if (!etat.selection.has(code)) etat.slots.delete(code);
   rendreTableau();
   rendreGraphique();
 }
@@ -1693,6 +1716,14 @@ function placerPoint(lat, lon, libelle) {
     carteEtat.cercle = L.circle([lat, lon], { radius: rayon, color: css("--accent"), weight: 1.5, fillOpacity: 0.06 }).addTo(carteEtat.carte);
   }
   document.getElementById("va-point-info").textContent = `Point : ${libelle}.`;
+  reverifierSiRayon();
+}
+
+// En mode rayon, déplacer le point ou changer le rayon relance la vérification si un résultat
+// est affiché : sinon le résultat resterait celui de l'ancien point ou de l'ancien rayon
+function reverifierSiRayon() {
+  const rayon = document.querySelector('input[name="va-mode"]:checked').value === "rayon";
+  if (rayon && document.getElementById("va-resultat").innerHTML) verifierAnnonce();
 }
 
 function afficherComparablesCarte(comp, rayon) {
@@ -1759,7 +1790,10 @@ if (window.SANS_CARTE) {
   document.getElementById("va-mode-rayon").hidden = true;
   document.getElementById("va-sans-carte").hidden = false;
 }
-document.getElementById("va-rayon").addEventListener("change", e => { if (carteEtat.cercle) carteEtat.cercle.setRadius(+e.target.value); });
+document.getElementById("va-rayon").addEventListener("change", e => {
+  if (carteEtat.cercle) carteEtat.cercle.setRadius(+e.target.value);
+  reverifierSiRayon();
+});
 document.getElementById("va-geocoder").addEventListener("click", geocoder);
 document.getElementById("va-adresse").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); geocoder(); } });
 
@@ -2034,6 +2068,9 @@ function texteRappelMiseAJour(jour = aujourdhui()) {
   zone.style.display = rappel ? "block" : "";
 }
 
+if (ANNEE_PARTIELLE !== null)
+  document.getElementById("note-graphique-partielle").textContent =
+    ` Le point ${ANNEE_PARTIELLE} ne porte que sur les ventes de ${MOIS_PARTIELLE} (année incomplète).`;
 construireFiltres();
 construireGroupes();
 rendreMeta();
