@@ -137,6 +137,10 @@
   .etoile .pastille { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--axis); }
   .etoile[aria-pressed="true"] .pastille { border: none; }
   .hausse { color: var(--text); }
+  /* Nom de commune cliquable : ouvre sa fiche */
+  .lien-fiche { all: unset; cursor: pointer; text-decoration: underline; text-decoration-color: var(--axis); text-underline-offset: 3px; }
+  .lien-fiche:hover { text-decoration-color: currentColor; }
+  .lien-fiche:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   /* Graphique */
   .legende { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; margin: 0 0 8px; color: var(--text-2); }
@@ -208,6 +212,7 @@
   <p class="sous-titre" id="sous-titre">Ventes réelles publiées par l'État (DVF).</p>
   <nav class="onglets" role="tablist">
     <button role="tab" aria-selected="true" data-cible="comparateur">Comparateur de communes</button>
+    <button role="tab" aria-selected="false" data-cible="fiche">Fiche commune</button>
     <button role="tab" aria-selected="false" data-cible="verificateur">Vérificateur d'annonce</button>
     <button role="tab" aria-selected="false" data-cible="budget">Budget → où acheter</button>
     <button role="tab" aria-selected="false" data-cible="rendement">Rendement locatif</button>
@@ -273,6 +278,27 @@
         <div class="table-wrap"><table id="tableau-annees"><thead></thead><tbody></tbody></table></div>
       </details>
     </div>
+  </section>
+
+  <!-- ================= Fiche commune ================= -->
+  <section id="fiche" hidden>
+    <div class="carte">
+      <h2>Choisir une commune</h2>
+      <p class="aide">Toutes les communes de la Sarthe. Une fiche s'ouvre aussi en cliquant sur le nom d'une commune dans le comparateur, ou sur une commune de la carte des prix.</p>
+      <form id="form-fiche" class="filtres" autocomplete="off">
+        <label>Commune
+          <input type="search" id="f-commune" list="toutes-communes" value="Le Mans (72181)" required style="min-width:230px">
+        </label>
+        <label>Type de bien
+          <select id="f-type">
+            <option value="maison" selected>Maisons</option>
+            <option value="appartement">Appartements</option>
+          </select>
+        </label>
+        <button class="petit" type="submit" style="padding:7px 16px">Afficher</button>
+      </form>
+    </div>
+    <div id="f-resultat"></div>
   </section>
 
   <!-- ================= Module 3 : vérificateur d'annonce ================= -->
@@ -471,7 +497,7 @@
       </div>
       <div class="legende-carte" id="c-legende" aria-label="Légende de la carte"></div>
       <div id="c-carte" role="img" aria-label="Carte de la Sarthe : prix médian au m² par commune (le même contenu est disponible en tableau sous la carte)"></div>
-      <p class="n" id="c-info" style="margin-top:6px">Survolez une commune pour voir son prix médian, le nombre de ventes et la période.</p>
+      <p class="n" id="c-info" style="margin-top:6px">Survolez une commune pour voir son prix médian, le nombre de ventes et la période ; cliquez dessus pour ouvrir sa fiche.</p>
       <details>
         <summary>Voir les données de la carte en tableau</summary>
         <div class="table-wrap"><table id="c-tableau"><thead></thead><tbody></tbody></table></div>
@@ -793,7 +819,7 @@ function rendreTableau() {
     else evol = `${e.pct > 0 ? "+" : ""}${e.pct.toFixed(1).replace(".", ",")} %<span class="n bloc">${nf.format(e.na)} → ${nf.format(e.nb)} ventes</span>`;
     tr.innerHTML = `
       <td><button class="etoile" aria-pressed="${slot !== undefined}" title="${slot !== undefined ? "Retirer la couleur dans le graphique" : "Mettre en couleur dans le graphique"}">
-            <span class="pastille" style="${slot !== undefined ? `background:${couleurSlot(slot)}` : ""}"></span></button>${c.nom}
+            <span class="pastille" style="${slot !== undefined ? `background:${couleurSlot(slot)}` : ""}"></span></button><button class="lien-fiche" title="Ouvrir la fiche de ${c.nom}">${c.nom}</button>
           <span class="zone">${LIBELLE_ZONE[c.zone]}</span></td>
       <td>${nf.format(s.n)}</td>
       <td>${ok ? euros(s.prix_median) : INSUFFISANT}</td>
@@ -803,6 +829,7 @@ function rendreTableau() {
       ${avecTerrain ? `<td>${ok ? (s.terrain_median != null ? nf.format(s.terrain_median) + " m²" : INSUFFISANT) : ""}</td>` : ""}
       <td>${evol}</td>`;
     tr.querySelector(".etoile").onclick = () => basculerMiseEnAvant(l.code);
+    tr.querySelector(".lien-fiche").onclick = () => ouvrirFiche(l.code, etat.type);
     tbody.append(tr);
   }
   if (!lignes.length) tbody.innerHTML = `<tr><td colspan="${colonnes.length}" class="insuffisant">Aucune commune cochée.</td></tr>`;
@@ -1044,6 +1071,10 @@ function afficherOnglet(cible, { focus = false } = {}) {
   // l'onglet ouvert apparaît dans l'adresse (#carte…) : on peut le garder en favori
   try { history.replaceState(null, "", cible === ONGLETS[0] ? location.pathname + location.search : `#${cible}`); } catch { /* sans effet */ }
   if (cible === "comparateur" && graphique) graphique.resize();
+  if (cible === "fiche") {   // fiche du Mans affichée à la première ouverture de l'onglet
+    if (!document.getElementById("f-resultat").innerHTML) rendreFiche();
+    else if (ficheGraphique) ficheGraphique.resize();
+  }
   if (cible === "carte") afficherCartePrix();   // carte créée à la première ouverture de l'onglet
 }
 BOUTONS_ONGLETS.forEach(b => b.onclick = () => afficherOnglet(b.dataset.cible));
@@ -1452,6 +1483,8 @@ function telechargerFichier(contenu, typeMime, nom) {
   setTimeout(() => URL.revokeObjectURL(lien.href), 2000);
 }
 const aujourdhui = () => new Date().toISOString().slice(0, 10);
+// « Saint-Mars-d'Outillé » -> « saint-mars-d-outille » (noms de fichiers)
+const slugifier = t => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 function telechargerComparables() {
   if (!dernierResultat) return;
@@ -1459,8 +1492,7 @@ function telechargerComparables() {
   // BOM + « ; » + CRLF : ouverture directe et correcte dans Excel en français
   const csv = "\uFEFF" + [t.entetes, ...t.lignes].map(l => l.map(celluleCsv).join(";")).join("\r\n") + "\r\n";
   const lieu = dernierResultat.modeRayon ? `rayon-${distanceTxt(dernierResultat.rayonFinal)}` : dernierResultat.c.nom;
-  const slug = lieu.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  const nom = `ventes-comparables_${slug}_${aujourdhui()}.csv`;
+  const nom = `ventes-comparables_${slugifier(lieu)}_${aujourdhui()}.csv`;
   telechargerFichier(csv, "text/csv;charset=utf-8", nom);
   messageExport(`Fichier ${nom} téléchargé (${pluriel(t.lignes.length, "vente")}).`);
 }
@@ -2001,7 +2033,7 @@ function calculerRendement(e) {
   const avertissements = [];
   if (!loy.fiable) avertissements.push(`${AVERT} <strong>Indicateur de loyer peu fiable</strong> pour ${c.nom} : ${loy.raisons.join(", ")}.`);
   if (surface < surfType * 0.6 || surface > surfType * 1.6)
-    avertissements.push(`${AVERT} Le loyer au m² est calculé pour un ${bienType}. Pour ${nf.format(surface)} m², le loyer réel au m² est en général ${surface > surfType ? "plus bas (grande surface)" : "plus haut (petite surface)"} : l'estimation est à prendre avec prudence.`);
+    avertissements.push(`${AVERT} Le loyer au m² est calculé pour ${type === "maison" ? "une" : "un"} ${bienType}. Pour ${nf.format(surface)} m², le loyer réel au m² est en général ${surface > surfType ? "plus bas (grande surface)" : "plus haut (petite surface)"} : l'estimation est à prendre avec prudence.`);
 
   sortie.innerHTML = `
     <div class="carte">
@@ -2137,7 +2169,7 @@ function rendreTableauCarte(res, type) {
   document.querySelector("#c-tableau thead").innerHTML =
     "<tr><th>Commune</th><th>Prix médian au m²</th><th>Ventes</th><th>Période</th><th>Classe</th></tr>";
   document.querySelector("#c-tableau tbody").innerHTML = lignes.map(({ c, r }) => `<tr>
-    <td>${c.nom} <span class="zone">${LIBELLE_ZONE[c.zone]}</span></td>
+    <td><button class="lien-fiche" data-fiche="${c.code}" title="Ouvrir la fiche de ${c.nom}">${c.nom}</button> <span class="zone">${LIBELLE_ZONE[c.zone]}</span></td>
     <td>${r.med != null ? euros(r.med) : INSUFFISANT}</td><td>${nf.format(r.n)}</td><td>${r.periode}</td>
     <td>${r.classe != null ? `${r.classe + 1} / ${NB_CLASSES_CARTE}` : "–"}</td></tr>`).join("");
 }
@@ -2151,6 +2183,7 @@ function texteInfoCommune(c, r, type) {
 function rendreCartePrix() {
   const type = document.getElementById("c-type").value;
   const res = classesCarte(type);
+  carteprix.res = res;   // pour la bulle ouverte au clic sur une commune
   document.getElementById("c-titre").textContent = `Prix médian au m² par commune – ${LIBELLE_TYPE[type].des}`;
   document.getElementById("c-aide").textContent =
     `Prix médian au m² de l'année ${DERNIERE} (ou ${B_ANNEES[0]}-${B_ANNEES[1]} cumulées s'il y a moins de ${SEUIL} ventes en ${DERNIERE}), ` +
@@ -2181,6 +2214,18 @@ function afficherCartePrix() {
         .bindTooltip("", { sticky: true })
         .on("mouseover", e => { e.target.setStyle({ weight: 2.5, color: css("--text") }); e.target.bringToFront(); info.textContent = e.target.getTooltip().getContent(); })
         .on("mouseout", e => { e.target.setStyle({ weight: 0.8, color: css("--surface") }); })
+        // clic (ou toucher sur téléphone) : bulle avec le prix et un bouton vers la fiche de la commune
+        .on("click", e => {
+          const type = document.getElementById("c-type").value;
+          const bulle = document.createElement("div");
+          const texte = document.createElement("p");
+          texte.style.margin = "0 0 6px";
+          texte.textContent = texteInfoCommune(c, carteprix.res.parCode[c.code], type);
+          const bouton = Object.assign(document.createElement("button"), { type: "button", className: "petit", textContent: "Ouvrir la fiche de la commune" });
+          bouton.onclick = () => { carte.closePopup(); ouvrirFiche(c.code, type); };
+          bulle.append(texte, bouton);
+          L.popup().setLatLng(e.latlng).setContent(bulle).openOn(carte);
+        })
         .addTo(carte);
       carteprix.couches.set(c.code, couche);
     }
@@ -2204,11 +2249,280 @@ function vueCarte(vue) {
 }
 
 document.getElementById("c-type").addEventListener("change", rendreCartePrix);
+document.getElementById("c-tableau").addEventListener("click", e => {
+  const b = e.target.closest(".lien-fiche");
+  if (b) ouvrirFiche(b.dataset.fiche, document.getElementById("c-type").value);
+});
 document.getElementById("c-vue-mans").addEventListener("click", () => vueCarte("mans"));
 document.getElementById("c-vue-sarthe").addEventListener("click", () => vueCarte("sarthe"));
 
+// ---------------------------------------------------------------------------
+// Fiche commune : ce que les données disent d'une commune (prix, évolution, loyer, ventes récentes)
+// ---------------------------------------------------------------------------
+const F_MAX_LIGNES = 100;   // ventes affichées au plus (les plus récentes) ; le CSV les contient toutes
+let ficheGraphique = null;
+let ficheVentes = null;     // { c, type, ventes } de la fiche affichée : pour les filtres et l'export
+
+// Ensemble de comparaison : Le Mans + 22 communes proches, ou le reste de la Sarthe
+// (mêmes noms que pour l'option « prix ramenés » : les médianes calculées sont partagées)
+function groupeDe(c) {
+  return c.zone !== "sarthe"
+    ? { nom: "Le Mans et ses 22 communes proches", codes: COMMUNES.filter(x => x.zone !== "sarthe").map(x => x.code) }
+    : { nom: "Sarthe hors Le Mans et ses 22 communes proches", codes: COMMUNES.filter(x => x.zone === "sarthe").map(x => x.code) };
+}
+
+// Statistiques de référence : dernière année complète, ou 2 dernières années cumulées sous 5 ventes
+// (même règle et même prix au m² que prixReference, utilisé par Budget, Rendement et la carte)
+function statsReference(code, type) {
+  const s = statsAnnee(code, DERNIERE, type);
+  if (s.prix_m2_median != null) return { ...s, periode: `${DERNIERE}` };
+  const liste = (VENTES[type][code] || []).filter(v => v.annee >= B_ANNEES[0] && v.annee <= B_ANNEES[1]);
+  return { ...statsSurVentes(liste), periode: `${B_ANNEES[0]}-${B_ANNEES[1]}` };
+}
+
+// Rang du prix au m² (1 = la moins chère) parmi les communes ayant assez de ventes
+function rangPrix(code, type, codes) {
+  const mien = prixReference(code, type).med;
+  if (mien == null) return null;
+  const meds = codes.map(k => prixReference(k, type).med).filter(m => m != null);
+  return { rang: 1 + meds.filter(m => m < mien).length, total: meds.length };
+}
+const ordinal = r => `${nf.format(r)}${r === 1 ? "re" : "e"}`;   // « 1re », « 12e » (une commune)
+
+function rendreFiche() {
+  const sortie = document.getElementById("f-resultat");
+  const c = trouverCommune(document.getElementById("f-commune").value);
+  const type = document.getElementById("f-type").value;
+  if (ficheGraphique) { ficheGraphique.destroy(); ficheGraphique = null; }
+  if (!c) {
+    ficheVentes = null;
+    sortie.innerHTML = '<div class="carte"><p class="erreur">Commune non trouvée : choisissez-la dans la liste proposée.</p></div>';
+    return;
+  }
+  const lib = LIBELLE_TYPE[type], avecTerrain = type === "maison";
+  const ref = statsReference(c.code, type), ok = ref.prix_m2_median != null;
+  const groupe = groupeDe(c), medGroupe = medianesParAnnee(type, groupe.nom, groupe.codes);
+  const lm = PAR_CODE[CODE_LE_MANS];
+
+  // Identité de la commune
+  const cp = c.codes_postaux || [];
+  const zoneTxt = c.code === CODE_LE_MANS ? "ville-centre" : { limitrophe: "commune limitrophe du Mans", couronne: "couronne du Mans", sarthe: "reste de la Sarthe" }[c.zone];
+  const identite = [
+    zoneTxt, `code INSEE ${c.code}`,
+    cp.length ? `${cp.length > 1 ? "codes postaux" : "code postal"} ${cp.join(", ")}` : null,
+    c.population != null ? `${nf.format(c.population)} habitants` : null,
+    c.code !== CODE_LE_MANS && c.lat != null ? `à ${nf.format(Math.round(distanceKm(c, lm)))} km du Mans (à vol d'oiseau, entre centres)` : null,
+  ].filter(Boolean).join(" · ");
+
+  // Évolution du prix au m² entre la première année et la dernière année complète
+  const a0 = statsAnnee(c.code, ANNEES[0], type), a1 = statsAnnee(c.code, DERNIERE, type);
+  const evolOk = a0.prix_m2_median != null && a1.prix_m2_median != null;
+  const evol = evolOk ? (a1.prix_m2_median - a0.prix_m2_median) / a0.prix_m2_median * 100 : null;
+
+  // Loyer d'annonce et rendement brut théorique (même calcul que l'onglet Rendement)
+  const loy = D.loyers[type][c.code];
+  const rangCoeur = c.zone !== "sarthe" ? rangPrix(c.code, type, groupe.codes) : null;
+  const rangSarthe = rangPrix(c.code, type, COMMUNES.map(x => x.code));
+  const rangs = [rangCoeur && `${ordinal(rangCoeur.rang)} sur ${nf.format(rangCoeur.total)} parmi Le Mans et ses 22 communes proches`,
+                 rangSarthe && `${ordinal(rangSarthe.rang)} sur ${nf.format(rangSarthe.total)} en Sarthe`].filter(Boolean);
+
+  const bloc = (libelle, chiffre, detail) =>
+    `<div><div class="libelle">${libelle}</div><div class="chiffre">${chiffre}</div><div class="n">${detail}</div></div>`;
+  const cles = [
+    bloc("Prix médian au m²", ok ? euros(ref.prix_m2_median) : INSUFFISANT,
+      `${pluriel(ref.n, "vente")}, ${ref.periode}${ok ? `<br>moitié centrale : ${nf.format(ref.prix_m2_q1)} – ${nf.format(ref.prix_m2_q3)} €` : ""}`),
+    bloc(`Prix médian d'${type === "maison" ? "une" : "un"} ${lib.un}`, ok ? euros(ref.prix_median) : INSUFFISANT,
+      ok ? `surface médiane ${nf.format(ref.surface_mediane)} m²${avecTerrain && ref.terrain_median != null ? `, terrain médian ${nf.format(ref.terrain_median)} m²` : ""}` : `${ref.periode}`),
+    bloc(`Évolution du prix au m², ${ANNEES[0]} → ${DERNIERE}`, evolOk ? pct(evol) : INSUFFISANT,
+      `${nf.format(a0.n)} → ${pluriel(a1.n, "vente")}`),
+    bloc("Loyer d'annonce", loy ? `${fmt2(loy.loyer_m2)} €<span style="font-size:15px;font-weight:400"> /m²/mois</span>` : "–",
+      loy ? `${loy.fiable ? "indicateur fiable" : `${AVERT} indicateur peu fiable`} ; rendement brut théorique ${ok ? `${fmt1(loy.loyer_m2 * 12 / ref.prix_m2_median * 100)} %` : "non calculable"}` : "pas d'indicateur pour cette commune"),
+  ].join("");
+
+  // Tableau année par année, avec la médiane de l'ensemble de comparaison
+  const lignesAnnees = ANNEES.map(a => {
+    const s = statsAnnee(c.code, a, type), g = medGroupe[a], okA = s.prix_m2_median != null;
+    return `<tr><td>${a === ANNEE_PARTIELLE ? `${a} <span class="n">(${MOIS_PARTIELLE})</span>` : a}</td><td>${nf.format(s.n)}</td>
+      <td>${okA ? euros(s.prix_median) : INSUFFISANT}</td><td>${okA ? euros(s.prix_m2_median) : INSUFFISANT}</td>
+      <td>${okA ? `${nf.format(s.prix_m2_q1)} – ${nf.format(s.prix_m2_q3)} €` : ""}</td><td>${okA ? nf.format(s.surface_mediane) + " m²" : ""}</td>
+      ${avecTerrain ? `<td>${okA && s.terrain_median != null ? nf.format(s.terrain_median) + " m²" : ""}</td>` : ""}
+      <td>${g && g.n >= SEUIL ? `${euros(Math.round(g.med))} <span class="n">(${nf.format(g.n)})</span>` : INSUFFISANT}</td></tr>`;
+  }).join("");
+
+  const ventes = (VENTES[type][c.code] || []).filter(v => v.date >= COMP_FENETRE.debut)
+    .sort((x, y) => y.date.localeCompare(x.date));
+  ficheVentes = { c, type, ventes };
+
+  sortie.innerHTML = `
+    <div class="carte">
+      <h2>${c.nom} – ${lib.des}</h2>
+      <p class="aide">${identite}</p>
+      <div class="verdict">${cles}</div>
+      ${rangs.length ? `<p style="margin:14px 0 0">Prix au m² : <strong>${rangs.join(", ")}</strong> (1re = la moins chère ; communes ayant au moins ${SEUIL} ventes).</p>` : ""}
+      ${loy ? `<p class="n">Loyer : ${D.meta.loyers.periode}, ${D.meta.loyers.unite}, pour ${type === "maison" ? "une" : "un"} ${D.meta.loyers.bien_type[type]} ; ${texteFiabilite(loy)}. Rendement brut théorique = loyer × 12 ÷ prix médian au m², avant charges, taxe foncière, vacance et impôts.</p>` : ""}
+      <div class="ajout" style="margin-top:12px">
+        <button class="petit" type="button" id="f-verifier">Vérifier une annonce dans cette commune</button>
+        <button class="petit" type="button" id="f-comparer">Voir dans le comparateur</button>
+      </div>
+    </div>
+
+    <div class="carte">
+      <h2>Année par année</h2>
+      <p class="aide">Médianes des ventes de ${lib.des} de chaque année (moins de ${SEUIL} ventes : pas de médiane). Dernière colonne : médiane de l'ensemble « ${groupe.nom} », pour comparer.${noteAnneePartielleFiche()}</p>
+      <div class="graphique" style="height:280px"><canvas id="f-graphique" role="img" aria-label="Prix médian au m² par année : ${c.nom} et ${groupe.nom} (mêmes chiffres dans le tableau)"></canvas></div>
+      <div class="table-wrap" style="margin-top:12px"><table>
+        <thead><tr><th>Année</th><th>Ventes</th><th>Prix médian</th><th>Prix médian au m²</th><th>1er – 3e quartile<br>au m²</th><th>Surface médiane</th>${avecTerrain ? "<th>Terrain médian</th>" : ""}<th>Médiane au m²<br>${groupe.nom}</th></tr></thead>
+        <tbody>${lignesAnnees}</tbody>
+      </table></div>
+    </div>
+
+    <div class="carte">
+      <h2>Ventes récentes</h2>
+      <p class="aide">Ventes de ${lib.des} ${COMP_FENETRE.texte}, de la plus récente à la plus ancienne. Filtres facultatifs :</p>
+      <div class="filtres" style="margin-bottom:10px">
+        <label>Surface min. (m²) <input type="number" id="f-smin" min="0" step="any" style="width:100px"></label>
+        <label>Surface max. (m²) <input type="number" id="f-smax" min="0" step="any" style="width:100px"></label>
+        <label>Prix max. (€) <input type="number" id="f-pmax" min="0" step="1000" style="width:120px"></label>
+        ${avecTerrain ? `<label>Terrain min. (m²) <input type="number" id="f-tmin" min="0" step="any" style="width:100px"></label>` : ""}
+        <button class="petit" type="button" id="f-csv">Télécharger (CSV)</button>
+        <span class="n" id="f-csv-msg" role="status"></span>
+      </div>
+      <div id="f-ventes"></div>
+    </div>`;
+  rendreVentesFiche();
+  dessinerGraphiqueFiche(c, type, groupe, medGroupe);
+}
+
+function noteAnneePartielleFiche() {
+  return ANNEE_PARTIELLE === null ? "" : ` ${ANNEE_PARTIELLE} est incomplète (ventes de ${MOIS_PARTIELLE} seulement).`;
+}
+
+function dessinerGraphiqueFiche(c, type, groupe, medGroupe) {
+  const zone = document.getElementById("f-graphique").parentElement;
+  if (!window.Chart) {
+    zone.style.height = "auto";
+    zone.innerHTML = '<p class="insuffisant">Graphique indisponible (fichier app/lib/chart/chart.umd.js introuvable). Les chiffres sont dans le tableau ci-dessous.</p>';
+    return;
+  }
+  const texte = css("--muted"), surface = css("--surface");
+  const serieCommune = ANNEES.map(a => statsAnnee(c.code, a, type).prix_m2_median ?? null);
+  const serieGroupe = ANNEES.map(a => medGroupe[a] && medGroupe[a].n >= SEUIL ? Math.round(medGroupe[a].med) : null);
+  ficheGraphique = new Chart(document.getElementById("f-graphique"), {
+    type: "line",
+    data: { labels: ANNEES.map(String), datasets: [
+      { label: c.nom, data: serieCommune, borderColor: css("--series-1"), backgroundColor: css("--series-1"), borderWidth: 2,
+        pointRadius: 4, pointBorderColor: surface, pointBorderWidth: 2, spanGaps: false, tension: 0 },
+      { label: groupe.nom, data: serieGroupe, borderColor: css("--muted"), backgroundColor: css("--muted"), borderWidth: 1.5,
+        borderDash: [5, 4], pointRadius: 0, spanGaps: false, tension: 0 },
+    ] },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        x: { grid: { display: false }, border: { color: css("--axis") },
+             ticks: { color: texte, callback(v) { const a = this.getLabelForValue(v); return +a === ANNEE_PARTIELLE ? `${a} (incomplète)` : a; } } },
+        y: { grid: { color: css("--grid") }, border: { display: false },
+             ticks: { color: texte, callback: v => nf.format(v) + " €" }, title: { display: true, text: "€/m² (médiane)", color: texte } },
+      },
+      plugins: {
+        legend: { labels: { color: css("--text-2"), boxHeight: 2, boxWidth: 16 } },
+        tooltip: { callbacks: {
+          title: items => items.length ? `Année ${anneeTxt(items[0].label)}` : "",
+          label: item => {
+            const n = item.datasetIndex === 0 ? statsAnnee(c.code, item.label, type).n : (medGroupe[item.label] || { n: 0 }).n;
+            return ` ${item.dataset.label} : ${item.raw === null ? "données insuffisantes" : `${euros(item.raw)}/m²`} (${pluriel(n, "vente")})`;
+          },
+        } },
+      },
+    },
+  });
+}
+
+// Ventes récentes filtrées (surface, prix, terrain) : tableau et résumé
+function ventesFicheFiltrees() {
+  if (!ficheVentes) return [];
+  const val = id => { const x = document.getElementById(id)?.value ?? ""; return x === "" ? null : +x; };
+  const smin = val("f-smin"), smax = val("f-smax"), pmax = val("f-pmax"), tmin = ficheVentes.type === "maison" ? val("f-tmin") : null;
+  return ficheVentes.ventes.filter(v => (smin == null || v.surface >= smin) && (smax == null || v.surface <= smax)
+    && (pmax == null || v.prix <= pmax) && (tmin == null || (v.terrain != null && v.terrain >= tmin)));
+}
+
+function rendreVentesFiche() {
+  const zone = document.getElementById("f-ventes");
+  if (!zone || !ficheVentes) return;
+  const { ventes, type } = ficheVentes, avecTerrain = type === "maison";
+  const liste = ventesFicheFiltrees(), n = liste.length, filtre = n !== ventes.length || ["f-smin", "f-smax", "f-pmax", "f-tmin"].some(id => document.getElementById(id)?.value);
+  const med = n >= SEUIL ? quantile(liste.map(v => v.prix_m2), .5) : null;
+  const resume = !ventes.length
+    ? `Aucune vente de ${LIBELLE_TYPE[type].des} ${COMP_FENETRE.texte}.`
+    : `${pluriel(n, "vente")}${filtre ? ` correspondant aux filtres (sur ${nf.format(ventes.length)})` : ""}` +
+      (n ? (med != null ? ` ; prix médian au m² de ces ventes : <strong>${euros(Math.round(med))}</strong>.` : ` ; moins de ${SEUIL} ventes : pas de médiane.`) : ".") +
+      (avecTerrain && document.getElementById("f-tmin")?.value ? " Les ventes sans terrain renseigné dans DVF sont exclues par le filtre sur le terrain." : "");
+  document.getElementById("f-csv").hidden = !n;
+  document.getElementById("f-csv-msg").textContent = "";
+  zone.innerHTML = `<p class="aide" role="status">${resume}</p>` + (n ? `
+    <div class="table-wrap"><table>
+      <thead><tr><th>Date</th><th>Prix</th><th>Surface</th>${avecTerrain ? "<th>Terrain</th>" : ""}<th>Pièces</th><th>Prix au m²</th></tr></thead>
+      <tbody>${liste.slice(0, F_MAX_LIGNES).map(v => `<tr><td>${dateFr(v.date)}</td><td>${euros(v.prix)}</td><td>${nf.format(v.surface)} m²</td>
+        ${avecTerrain ? `<td>${v.terrain != null ? nf.format(v.terrain) + " m²" : "–"}</td>` : ""}<td>${v.pieces || "–"}</td><td>${euros(v.prix_m2)}</td></tr>`).join("")}</tbody>
+    </table></div>
+    ${n > F_MAX_LIGNES ? `<p class="n">Les ${F_MAX_LIGNES} plus récentes sont affichées ; le fichier CSV contient les ${nf.format(n)}.</p>` : ""}` : "");
+}
+
+function telechargerVentesFiche() {
+  const liste = ventesFicheFiltrees();
+  if (!liste.length) return;
+  const { c, type } = ficheVentes, avecTerrain = type === "maison";
+  const entetes = ["Date", "Commune", "Code INSEE", "Prix (€)", "Surface (m²)", ...(avecTerrain ? ["Terrain (m²)"] : []), "Pièces", "Prix au m² (€)"];
+  const lignes = liste.map(v => [dateFr(v.date), c.nom, c.code, v.prix, v.surface, ...(avecTerrain ? [v.terrain ?? ""] : []), v.pieces || "", v.prix_m2]);
+  const csv = "﻿" + [entetes, ...lignes].map(l => l.map(celluleCsv).join(";")).join("\r\n") + "\r\n";
+  const nom = `ventes_${slugifier(c.nom)}_${LIBELLE_TYPE[type].des}_${aujourdhui()}.csv`;
+  telechargerFichier(csv, "text/csv;charset=utf-8", nom);
+  document.getElementById("f-csv-msg").textContent = `Fichier ${nom} téléchargé (${pluriel(liste.length, "vente")}).`;
+}
+
+// Ouvre la fiche d'une commune (depuis le comparateur ou la carte des prix)
+function ouvrirFiche(code, type) {
+  const c = PAR_CODE[code];
+  if (!c) return;
+  document.getElementById("f-commune").value = `${c.nom} (${c.code})`;
+  if (type) document.getElementById("f-type").value = type;
+  rendreFiche();
+  afficherOnglet("fiche");
+  if (ficheGraphique) ficheGraphique.resize();
+  document.getElementById("fiche").scrollIntoView({ block: "start" });
+}
+
+document.getElementById("form-fiche").addEventListener("submit", e => { e.preventDefault(); rendreFiche(); focaliserResultat("f-resultat"); });
+document.getElementById("f-type").addEventListener("change", rendreFiche);
+document.getElementById("f-resultat").addEventListener("input", e => { if (/^f-(smin|smax|pmax|tmin)$/.test(e.target.id)) rendreVentesFiche(); });
+document.getElementById("f-resultat").addEventListener("click", e => {
+  const id = e.target.closest("button")?.id;
+  if (!id || !ficheVentes) return;
+  const { c, type } = ficheVentes;
+  if (id === "f-csv") telechargerVentesFiche();
+  else if (id === "f-verifier") {
+    // vérificateur prérempli : commune et type de bien, comparaison avec les ventes de la commune
+    document.getElementById("va-commune").value = `${c.nom} (${c.code})`;
+    document.getElementById("va-type").value = type;
+    ajusterChampsAnnonce();
+    const radio = document.querySelector('input[name="va-mode"][value="commune"]');
+    if (!radio.checked) { radio.checked = true; radio.dispatchEvent(new Event("change")); }
+    afficherOnglet("verificateur");
+    document.getElementById("va-prix").focus();
+  } else if (id === "f-comparer") {
+    etat.selection.add(c.code);
+    if (c.zone === "sarthe" && !etat.ajoutees.includes(c.code)) etat.ajoutees.push(c.code);
+    etat.type = type;
+    document.getElementById("type-bien").value = type;
+    construireGroupes(); rendre();
+    afficherOnglet("comparateur");
+  }
+});
+
 // Le graphique et les cartes relisent leurs couleurs si le thème du système change
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  if (ficheVentes) rendreFiche();
   if (carteprix.carte) rendreCartePrix();
   rendre();
   if (carteEtat.cercle) carteEtat.cercle.setStyle({ color: css("--accent") });
