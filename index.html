@@ -99,7 +99,7 @@
   .filtres { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; }
   .filtres label { font-size: 13px; color: var(--text-2); display: flex; flex-direction: column; gap: 4px; }
   .filtres label.case { flex-direction: row; align-items: center; color: var(--text); font-size: 14px; }
-  select, input[type="search"], input[type="number"] {
+  select, input[type="search"], input[type="number"], input[type="password"] {
     font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--axis);
     border-radius: 6px; padding: 6px 8px;
   }
@@ -395,6 +395,21 @@
         <button class="petit" type="button" id="va-suivies-effacer" hidden>Tout effacer</button>
         <span class="n" id="va-suivies-msg" role="status">La sauvegarde protège la liste si les données du navigateur sont effacées, ou pour la passer sur un autre ordinateur. Elle contient vos annonces : gardez-la hors du dossier du projet.</span>
       </div>
+      <details id="va-suivies-protection">
+        <summary>Protéger la sauvegarde par un mot de passe (facultatif)</summary>
+        <p class="aide" style="margin-top:8px">Avec un mot de passe, le fichier est chiffré dans la page avant d'être téléchargé (AES 256 bits) : sans le mot de passe il est illisible,
+          vous pouvez donc le ranger dans un espace en ligne ou l'envoyer sur votre téléphone. Le mot de passe n'est enregistré nulle part :
+          <strong>s'il est perdu, la sauvegarde l'est aussi.</strong> Pour restaurer un fichier protégé, saisissez ici son mot de passe.</p>
+        <div class="filtres">
+          <label>Mot de passe (8 caractères au moins)
+            <input type="password" id="va-mdp" autocomplete="new-password">
+          </label>
+          <label>Confirmation (pour sauvegarder)
+            <input type="password" id="va-mdp2" autocomplete="new-password">
+          </label>
+          <button class="petit" type="button" id="va-suivies-dechiffrer" hidden>Déchiffrer le fichier choisi</button>
+        </div>
+      </details>
     </div>
   </section>
 
@@ -1660,12 +1675,71 @@ function texteSauvegarde() {
 }
 function messageSuivies(texte) { document.getElementById("va-suivies-msg").textContent = texte; }
 
-function sauvegarderSuivies() {
+// ---------------------------------------------------------------------------
+// Sauvegarde protégée (facultative) : chiffrement AES-GCM 256 bits, clé tirée du mot de passe
+// par PBKDF2-SHA-256 (sel aléatoire). Tout se fait dans la page avec le chiffrement intégré au
+// navigateur ; le mot de passe n'est jamais gardé (champ vidé après usage).
+// ---------------------------------------------------------------------------
+const CHIFFREMENT = { algo: "AES-GCM", derivation: "PBKDF2-SHA-256", iterations: 600000 };
+const MDP_MIN = 8;
+const ITERATIONS_MAX = 5000000;   // un fichier modifié ne doit pas pouvoir bloquer la page
+const chiffrementDisponible = () => !!(window.crypto && window.crypto.subtle && window.TextEncoder && window.TextDecoder);
+const versBase64 = octets => {
+  let s = "";
+  for (let i = 0; i < octets.length; i += 0x8000) s += String.fromCharCode(...octets.subarray(i, i + 0x8000));
+  return btoa(s);
+};
+const depuisBase64 = t => Uint8Array.from(atob(String(t)), ch => ch.charCodeAt(0));
+
+async function cleDepuisMdp(mdp, sel, iterations) {
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(mdp), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({ name: "PBKDF2", hash: "SHA-256", salt: sel, iterations }, base,
+                                 { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+}
+async function chiffrerTexte(texte, mdp) {
+  const sel = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+  const cle = await cleDepuisMdp(mdp, sel, CHIFFREMENT.iterations);
+  const donnees = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, cle, new TextEncoder().encode(texte)));
+  return { ...CHIFFREMENT, sel: versBase64(sel), iv: versBase64(iv), donnees: versBase64(donnees) };
+}
+// Lève une erreur si le fichier n'a pas le format attendu, si le mot de passe est faux ou si le
+// fichier a été modifié (AES-GCM vérifie l'intégrité des données)
+async function dechiffrerTexte(c, mdp) {
+  if (!c || c.algo !== CHIFFREMENT.algo || c.derivation !== CHIFFREMENT.derivation ||
+      !Number.isInteger(c.iterations) || c.iterations < 100000 || c.iterations > ITERATIONS_MAX) throw new Error("format");
+  const cle = await cleDepuisMdp(mdp, depuisBase64(c.sel), c.iterations);
+  return new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: depuisBase64(c.iv) }, cle, depuisBase64(c.donnees)));
+}
+function viderMotsDePasse() { for (const id of ["va-mdp", "va-mdp2"]) document.getElementById(id).value = ""; }
+
+async function sauvegarderSuivies() {
   const n = lireSuivies().length;
   if (!n) return;
-  const nom = `annonces-suivies_${aujourdhui()}.json`;
-  telechargerFichier(texteSauvegarde(), "application/json", nom);
-  messageSuivies(`${pluriel(n, "annonce")} dans le fichier ${nom} (dossier des téléchargements). Gardez-le hors du dossier du projet.`);
+  const mdp = document.getElementById("va-mdp").value, mdp2 = document.getElementById("va-mdp2").value;
+  let contenu = texteSauvegarde(), protege = false;
+  if (mdp || mdp2) {
+    document.getElementById("va-suivies-protection").open = true;
+    if (!chiffrementDisponible()) { messageSuivies("Chiffrement indisponible dans ce navigateur : sauvegarde non faite. Videz le champ du mot de passe pour une sauvegarde non protégée."); return; }
+    if (mdp.length < MDP_MIN) { messageSuivies(`Mot de passe trop court : ${MDP_MIN} caractères au moins. Sauvegarde non faite.`); return; }
+    if (mdp !== mdp2) { messageSuivies("Les deux mots de passe ne sont pas identiques. Sauvegarde non faite."); return; }
+    messageSuivies("Chiffrement en cours…");
+    try {
+      const chiffre = await chiffrerTexte(contenu, mdp);
+      // contrôle : le fichier doit se relire avec ce mot de passe avant d'être proposé
+      if (await dechiffrerTexte(chiffre, mdp) !== contenu) throw new Error("relecture");
+      contenu = JSON.stringify({ format: FORMAT_SAUVEGARDE, version: 1, sauvegarde_le: aujourdhui(), chiffre }, null, 1);
+      protege = true;
+    } catch {
+      messageSuivies("Le chiffrement a échoué : sauvegarde non faite.");
+      return;
+    }
+    viderMotsDePasse();
+  }
+  const nom = `annonces-suivies_${aujourdhui()}${protege ? "_protegee" : ""}.json`;
+  telechargerFichier(contenu, "application/json", nom);
+  messageSuivies(protege
+    ? `${pluriel(n, "annonce")} dans le fichier ${nom}, protégé par mot de passe. Sans ce mot de passe le fichier est illisible : gardez-le dans un endroit sûr.`
+    : `${pluriel(n, "annonce")} dans le fichier ${nom} (dossier des téléchargements). Gardez-le hors du dossier du projet.`);
 }
 
 // Ajoute à la liste les annonces d'une sauvegarde ; celles déjà présentes (même identifiant) sont ignorées
@@ -1688,15 +1762,56 @@ function restaurerDepuisTexte(texte) {
   return { ajoutees, deja, ignorees };
 }
 
-async function restaurerDepuisFichier(fichier) {
-  if (!fichier) return;
-  if (fichier.size > 5e6) { messageSuivies("Fichier trop gros pour une sauvegarde d'annonces suivies."); return; }
-  const r = restaurerDepuisTexte(await fichier.text());
+// Fichier protégé choisi sans mot de passe (ou avec un mauvais) : gardé ici le temps de saisir le bon
+let sauvegardeEnAttente = null;
+
+// Restaure une sauvegarde, protégée ou non (mot de passe lu dans le champ prévu)
+async function restaurerSauvegarde(texte) {
+  let donnees = null;
+  try { donnees = JSON.parse(texte); } catch { /* restaurerDepuisTexte donnera le message d'erreur */ }
+  if (!(donnees && donnees.format === FORMAT_SAUVEGARDE && donnees.chiffre)) {
+    sauvegardeEnAttente = null;
+    return restaurerDepuisTexte(texte);
+  }
+  if (!chiffrementDisponible()) { sauvegardeEnAttente = null; return { erreur: "Ce fichier est protégé, mais ce navigateur ne sait pas le déchiffrer." }; }
+  sauvegardeEnAttente = donnees.chiffre;
+  const mdp = document.getElementById("va-mdp").value;
+  if (!mdp) return { attente: true };
+  let clair;
+  try { clair = await dechiffrerTexte(donnees.chiffre, mdp); }
+  catch { return { attente: true, erreur: "Mot de passe incorrect, ou fichier modifié : rien n'a été restauré." }; }
+  sauvegardeEnAttente = null;
+  viderMotsDePasse();
+  return restaurerDepuisTexte(clair);
+}
+
+function afficherRestauration(r) {
+  document.getElementById("va-suivies-dechiffrer").hidden = !r.attente;
+  if (r.attente) document.getElementById("va-suivies-protection").open = true;
+  if (r.attente && !r.erreur) {
+    messageSuivies("Ce fichier est protégé : saisissez son mot de passe ci-dessous, puis cliquez sur « Déchiffrer le fichier choisi ».");
+    document.getElementById("va-mdp").focus();
+    return;
+  }
   messageSuivies(r.erreur || [
     `${pluriel(r.ajoutees, "annonce")} ${r.ajoutees > 1 ? "restaurées" : "restaurée"}`,
     r.deja ? `${nf.format(r.deja)} déjà ${r.deja > 1 ? "présentes" : "présente"}` : "",
     r.ignorees ? `${nf.format(r.ignorees)} ${r.ignorees > 1 ? "ignorées (incomplètes ou illisibles)" : "ignorée (incomplète ou illisible)"}` : "",
   ].filter(Boolean).join(" ; ") + ".");
+}
+
+async function restaurerDepuisFichier(fichier) {
+  if (!fichier) return;
+  if (fichier.size > 5e6) { messageSuivies("Fichier trop gros pour une sauvegarde d'annonces suivies."); return; }
+  afficherRestauration(await restaurerSauvegarde(await fichier.text()));
+}
+
+// « Déchiffrer le fichier choisi » : nouvel essai avec le mot de passe saisi
+async function dechiffrerEnAttente() {
+  if (!sauvegardeEnAttente) return;
+  if (!document.getElementById("va-mdp").value) { messageSuivies("Saisissez d'abord le mot de passe du fichier."); return; }
+  messageSuivies("Déchiffrement en cours…");
+  afficherRestauration(await restaurerSauvegarde(JSON.stringify({ format: FORMAT_SAUVEGARDE, version: 1, chiffre: sauvegardeEnAttente })));
 }
 
 let confirmationEffacer = null;
@@ -1883,6 +1998,8 @@ document.getElementById("va-suivies").addEventListener("click", e => {
 document.getElementById("va-suivies-effacer").addEventListener("click", effacerSuivies);
 document.getElementById("va-suivies-sauver").addEventListener("click", sauvegarderSuivies);
 document.getElementById("va-suivies-restaurer").addEventListener("click", () => document.getElementById("va-suivies-fichier").click());
+document.getElementById("va-suivies-dechiffrer").addEventListener("click", dechiffrerEnAttente);
+document.getElementById("va-mdp").addEventListener("keydown", e => { if (e.key === "Enter" && sauvegardeEnAttente) { e.preventDefault(); dechiffrerEnAttente(); } });
 document.getElementById("va-suivies-fichier").addEventListener("change", async e => {
   await restaurerDepuisFichier(e.target.files[0]);
   e.target.value = "";   // permet de choisir à nouveau le même fichier
